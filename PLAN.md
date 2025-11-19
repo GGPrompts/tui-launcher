@@ -237,18 +237,268 @@ type model struct {
 
 ## Implementation Phases
 
-### Phase 1: Core Tree View ✅
+### Phase 1: Core Tree View (In Progress)
 **Goal:** Basic tree navigation with TFE patterns
 
 - [x] Project structure
+- [x] Type definitions (`types.go`)
+- [x] Emoji constants (no variation selectors!)
+- [ ] **Config loading (YAML) - NEXT**
 - [ ] Port `treeItem` structure from TFE
 - [ ] Port `buildTreeItems()` logic
 - [ ] Port `renderTreeView()` with emoji width handling
 - [ ] Basic keyboard navigation (arrows, enter, esc)
 - [ ] Expand/collapse categories
-- [ ] Config loading (YAML)
 
-**Files:** `types.go`, `tree.go`, `config.go`, `update_keyboard.go`, `view.go`
+**Files:** `types.go` ✅, `tree.go`, `config.go` 🎯, `update_keyboard.go`, `view.go`
+
+#### Config Loading Implementation Plan
+
+**Goal:** Load YAML config and convert to `launchItem` tree structure
+
+**Step 1: YAML Parsing (`config.go`)**
+```go
+func loadConfig() (Config, error) {
+    // 1. Get config path: ~/.config/tui-launcher/config.yaml
+    configPath := filepath.Join(os.Getenv("HOME"), ".config/tui-launcher/config.yaml")
+
+    // 2. Check if file exists, create default if not
+    if !fileExists(configPath) {
+        return createDefaultConfig(configPath)
+    }
+
+    // 3. Read and parse YAML
+    data, err := os.ReadFile(configPath)
+    if err != nil {
+        return Config{}, fmt.Errorf("failed to read config: %w", err)
+    }
+
+    var config Config
+    if err := yaml.Unmarshal(data, &config); err != nil {
+        return Config{}, fmt.Errorf("failed to parse config: %w", err)
+    }
+
+    return config, nil
+}
+```
+
+**Step 2: Convert Config to Launch Items**
+```go
+func buildLaunchItemsFromConfig(config Config) []launchItem {
+    items := []launchItem{}
+
+    // 1. Projects section (top-level categories)
+    for _, proj := range config.Projects {
+        projectItem := launchItem{
+            Name:     proj.Name,
+            Path:     "projects/" + proj.Name,
+            ItemType: typeCategory,
+            Icon:     proj.Icon,
+            Children: []launchItem{},
+        }
+
+        // Add commands as children
+        for _, cmd := range proj.Commands {
+            projectItem.Children = append(projectItem.Children, launchItem{
+                Name:         cmd.Name,
+                Path:         "projects/" + proj.Name + "/" + cmd.Name,
+                ItemType:     typeCommand,
+                Icon:         cmd.Icon,
+                Command:      cmd.Command,
+                Cwd:          resolvePath(cmd.Cwd, proj.Path),
+                DefaultSpawn: parseSpawnMode(cmd.Spawn),
+            })
+        }
+
+        // Add profiles as children
+        for _, profile := range proj.Profiles {
+            projectItem.Children = append(projectItem.Children, launchItem{
+                Name:      profile.Name,
+                Path:      "projects/" + proj.Name + "/" + profile.Name,
+                ItemType:  typeProfile,
+                Icon:      profile.Icon,
+                IsProfile: true,
+                Layout:    parseLayout(profile.Layout),
+                Panes:     profile.Panes,
+            })
+        }
+
+        items = append(items, projectItem)
+    }
+
+    // 2. Tools section
+    for _, cat := range config.Tools {
+        categoryItem := buildCategoryItem("tools", cat)
+        items = append(items, categoryItem)
+    }
+
+    // 3. AI section
+    aiCategory := launchItem{
+        Name:     "AI Commands",
+        Path:     "ai",
+        ItemType: typeCategory,
+        Icon:     emojiAI,
+        Children: []launchItem{},
+    }
+    for _, cmd := range config.AI {
+        aiCategory.Children = append(aiCategory.Children, buildCommandItem("ai", cmd))
+    }
+    items = append(items, aiCategory)
+
+    // 4. Scripts section
+    for _, cat := range config.Scripts {
+        categoryItem := buildCategoryItem("scripts", cat)
+        items = append(items, categoryItem)
+    }
+
+    return items
+}
+```
+
+**Step 3: Helper Functions**
+```go
+// parseSpawnMode converts string to spawnMode enum
+func parseSpawnMode(s string) spawnMode {
+    switch s {
+    case "tmux-split-h":
+        return spawnTmuxSplitH
+    case "tmux-split-v":
+        return spawnTmuxSplitV
+    case "tmux-window":
+        return spawnTmuxWindow
+    case "xterm-window":
+        return spawnXtermWindow
+    case "current-pane":
+        return spawnCurrentPane
+    default:
+        // Auto-detect: tmux split if in tmux, else xterm
+        return spawnTmuxSplitH
+    }
+}
+
+// parseLayout converts string to tmuxLayout enum
+func parseLayout(s string) tmuxLayout {
+    switch s {
+    case "main-vertical":
+        return layoutMainVertical
+    case "main-horizontal":
+        return layoutMainHorizontal
+    case "tiled":
+        return layoutTiled
+    case "even-horizontal":
+        return layoutEvenHorizontal
+    case "even-vertical":
+        return layoutEvenVertical
+    default:
+        return layoutMainVertical
+    }
+}
+
+// resolvePath resolves relative paths, handles empty strings
+func resolvePath(cmdPath, projectPath string) string {
+    if cmdPath != "" {
+        return expandHome(cmdPath)
+    }
+    if projectPath != "" {
+        return expandHome(projectPath)
+    }
+    return os.Getenv("HOME")
+}
+
+// expandHome replaces ~ with home directory
+func expandHome(path string) string {
+    if strings.HasPrefix(path, "~/") {
+        return filepath.Join(os.Getenv("HOME"), path[2:])
+    }
+    return path
+}
+```
+
+**Step 4: Default Config Creation**
+```go
+func createDefaultConfig(configPath string) (Config, error) {
+    // Create config directory
+    configDir := filepath.Dir(configPath)
+    if err := os.MkdirAll(configDir, 0755); err != nil {
+        return Config{}, err
+    }
+
+    // Write default config (minimal example)
+    defaultYAML := `# TUI Launcher Configuration
+
+projects:
+  - name: Example Project
+    icon: 📦
+    path: ~/projects/example
+    commands:
+      - name: Open TFE
+        icon: 📂
+        command: tfe
+        spawn: tmux-split-h
+
+tools:
+  - category: System
+    icon: 📊
+    items:
+      - name: htop
+        icon: 💹
+        command: htop
+        spawn: tmux-split-v
+`
+
+    if err := os.WriteFile(configPath, []byte(defaultYAML), 0644); err != nil {
+        return Config{}, err
+    }
+
+    // Parse and return it
+    var config Config
+    yaml.Unmarshal([]byte(defaultYAML), &config)
+    return config, nil
+}
+```
+
+**Step 5: Integration with Model**
+```go
+// In model.go: initialModel()
+func initialModel() model {
+    // Load config
+    config, err := loadConfig()
+    if err != nil {
+        // Handle error (show in UI)
+        config = Config{} // Empty config
+    }
+
+    // Convert to launch items
+    items := buildLaunchItemsFromConfig(config)
+
+    return model{
+        items:         items,
+        config:        config,
+        expandedItems: make(map[string]bool),
+        selectedItems: make(map[string]bool),
+        // ... other fields
+    }
+}
+```
+
+**Testing:**
+```bash
+# Should create default config if missing
+rm ~/.config/tui-launcher/config.yaml
+./tui-launcher  # Creates default config.yaml
+
+# Should parse existing config
+./tui-launcher  # Loads from config.yaml
+```
+
+**Error Handling:**
+- File not found → Create default config
+- Parse error → Show error message in UI, continue with empty config
+- Missing fields → Use sensible defaults (empty string, HOME dir, etc.)
+
+**Files to Create:**
+- `config.go` - All config loading logic
+- `helpers.go` - Path helpers, string utils
 
 ### Phase 2: Multi-Select System
 **Goal:** Space to select, visual indicators
@@ -263,18 +513,25 @@ type model struct {
 
 **Files:** `update_keyboard.go`, `tree.go`, `view.go`
 
-### Phase 3: Single Spawn Logic
+### Phase 3: Single Spawn Logic ✅ COMPLETED
 **Goal:** Launch individual commands
 
-- [ ] Detect if inside tmux (`$TMUX` env var)
-- [ ] Spawn in tmux split horizontal
-- [ ] Spawn in tmux split vertical
-- [ ] Spawn in tmux new window
-- [ ] Spawn in xterm window
-- [ ] Set working directory per command
-- [ ] Default spawn mode per item
+- [x] Detect if inside tmux (`$TMUX` env var) - `insideTmux()`
+- [x] Spawn in tmux split horizontal - `tmuxSplitHorizontal()`
+- [x] Spawn in tmux split vertical - `tmuxSplitVertical()`
+- [x] Spawn in tmux new window - `tmuxNewWindow()`
+- [x] Spawn in xterm window - `xtermWindow()`
+- [x] Set working directory per command - All functions support `item.Cwd`
+- [x] Default spawn mode per item - `item.DefaultSpawn`
 
-**Files:** `spawn.go`, `helpers.go`
+**Files:** `spawn.go` ✅
+
+**Implementation Notes:**
+- Uses tmuxplexer's proven pattern: create all panes first, then apply layout
+- 10ms delay between pane creation for stability
+- Supports per-pane working directories
+- Auto-generates unique session names with timestamps
+- Context-aware: adapts to inside/outside tmux
 
 ### Phase 4: Multi-Spawn Dialog
 **Goal:** Batch launches with layout selection
