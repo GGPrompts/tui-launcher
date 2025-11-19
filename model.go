@@ -127,6 +127,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Toggle tmux/xterm mode
 			m.useTmux = !m.useTmux
 
+		case "e":
+			// Edit config file
+			return m, tea.Sequence(
+				tea.Quit,
+				editConfig,
+			)
+
 		case "enter":
 			// Launch selected items or current item
 			if m.cursor < len(m.treeItems) {
@@ -290,7 +297,7 @@ func (m model) View() string {
 	}
 
 	// Footer
-	footerText := "↑/↓: navigate  Space: expand/select  c: clear  t: toggle mode  Enter: launch  q: quit"
+	footerText := "↑/↓: navigate  Space: expand/select  e: edit config  c: clear  t: toggle mode  Enter: launch  q: quit"
 	sb.WriteString(renderScrollingFooter(footerText, m.width, m.footerOffset))
 	sb.WriteString("\n")
 
@@ -413,4 +420,48 @@ func runCommandDirectly(item launchItem) tea.Cmd {
 		os.Exit(0)
 		return nil
 	}
+}
+
+// editConfig opens the config file in the user's editor
+func editConfig() tea.Msg {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	configPath := filepath.Join(homeDir, ".config", "tui-launcher", "config.yaml")
+
+	// Get editor from environment, fallback to sensible defaults
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		// Check which editors are available
+		for _, e := range []string{"micro", "vim", "nano", "vi"} {
+			if _, err := exec.LookPath(e); err == nil {
+				editor = e
+				break
+			}
+		}
+	}
+	if editor == "" {
+		fmt.Printf("No editor found. Set $EDITOR or install micro/vim/nano\n")
+		os.Exit(1)
+	}
+
+	// Open editor
+	cmd := exec.Command(editor, configPath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Editor failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(0)
+	return nil
 }
