@@ -11,8 +11,8 @@ func main() {
 	// Create initial model
 	m := initialModel()
 
-	// Create program with alt screen
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	// Create program with alt screen and mouse support
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithMouseAllMotion())
 
 	// Run the program
 	if _, err := p.Run(); err != nil {

@@ -196,6 +196,7 @@ type model struct {
 
 	// Tree navigation
 	cursor        int
+	rootItems     []launchItem
 	treeItems     []launchTreeItem
 	expandedItems map[string]bool
 
@@ -218,6 +219,10 @@ type model struct {
 	// Terminal detection
 	terminalType  terminalType
 	insideTmux    bool
+	useTmux       bool // Toggle for tmux vs xterm spawning
+
+	// Footer scrolling
+	footerOffset  int // Horizontal scroll offset for footer text
 }
 
 // Config represents the configuration file structure
@@ -279,3 +284,6 @@ type configLoadedMsg struct {
 	config Config
 	err    error
 }
+
+// footerTickMsg is sent periodically to animate footer scrolling
+type footerTickMsg struct{}
