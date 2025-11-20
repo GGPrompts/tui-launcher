@@ -4,6 +4,55 @@
 
 ---
 
+## 🚨 Priority Issues for Next Session
+
+### Critical: Command & Hotkey Audit
+**Problem:** Several core features appear broken or provide no feedback:
+- **'e' key (edit config)** - Not working reliably
+- **Launch commands** - Many spawn options don't seem to work
+- **No visual feedback** - Commands launch but TUI just disappears (confusing UX)
+
+**Action Items:**
+1. **Audit all keyboard shortcuts** - Test each key binding:
+   - [ ] 'e' - Edit config (inside/outside tmux)
+   - [ ] Enter - Launch commands (all spawn modes)
+   - [ ] Space - Selection/expansion
+   - [ ] Tab - Pane switching
+   - [ ] 'i' - Info toggle (mobile mode)
+   - [ ] 't' - Toggle tmux mode
+   - [ ] 'c' - Clear selections
+
+2. **Test all spawn modes:**
+   - [ ] `tmux-window` - New tmux window
+   - [ ] `tmux-split-h` - Horizontal split
+   - [ ] `tmux-split-v` - Vertical split
+   - [ ] `tmux-layout` - Custom layout
+   - [ ] `current-pane` - Replace current pane
+   - [ ] `xterm-window` - New xterm window
+   - [ ] Direct mode (non-tmux)
+
+3. **Add visual feedback for launches:**
+   - [ ] Show "Launching..." message before quit
+   - [ ] Display which commands are being spawned
+   - [ ] Show spawn mode being used
+   - [ ] Add delay or confirmation before exit
+   - [ ] Consider toast/notification for successful launches
+   - [ ] Error messages if spawn fails
+
+4. **Improve error handling:**
+   - [ ] Catch spawn errors and display them
+   - [ ] Don't quit if launch fails
+   - [ ] Show helpful error messages
+   - [ ] Validate commands before spawning
+
+**Expected Outcome:**
+- All hotkeys work reliably
+- Clear visual feedback when commands launch
+- Users understand what's happening (not just "it disappeared")
+- Failed launches show helpful error messages
+
+---
+
 ## Vision
 
 Create a tree-based TUI launcher that allows:
@@ -13,6 +62,7 @@ Create a tree-based TUI launcher that allows:
 - **Context-aware spawning** (inside tmux vs standalone)
 - **Project-based working directories** for proper context
 - **Saved profiles** for complex multi-pane setups
+- **Responsive layouts** adapting from desktop to mobile (Termux)
 
 ### Why Not Just mcfly?
 
@@ -23,898 +73,239 @@ They complement each other - mcfly for ad-hoc commands, launcher for organized w
 
 ---
 
-## Core Features
-
-### 1. Tree View Navigation
-- ✅ Hierarchical tree structure (borrowed from TFE)
-- ✅ Expandable categories with `▶`/`▼` indicators
-- ✅ Tree connectors: `├─`, `└─`, `│`
-- ✅ Emoji icons for visual identification
-- ✅ Multi-level nesting (Projects → Commands, Categories → Tools)
-- ✅ Smooth scrolling in narrow terminals (Termux-optimized)
-
-### 2. Multi-Select System
-- **Space:** Toggle selection (☐ → ☑)
-- **Enter:** Launch selected items (or single item at cursor)
-- **Esc:** Clear selections
-- **a:** Select all in current category
-- **c:** Clear all selections
-- Visual indicators: ☑ checkbox for selected items
-- Status bar shows selection count
-
-### 3. Spawn Modes
-
-#### Single Item Launch
-- Quick launch with default spawn mode
-- Configurable per-item defaults
-
-#### Multi-Item Launch
-- Batch spawn dialog appears when 2+ items selected
-- Choose tmux layout:
-  - 📐 `main-vertical` - Main pane left, others stacked right
-  - 📏 `main-horizontal` - Main pane top, others stacked below
-  - 🔲 `tiled` - Grid layout
-  - ⚡ `even-horizontal` - Equal width columns
-  - ⚡ `even-vertical` - Equal height rows
-
-#### Spawn Options
-- 🪟 **New xterm window** - Separate window (non-tmux)
-- 🔲 **Tmux new window** - New window in current session
-- ⬛ **Tmux split horizontal** - Split current pane horizontally
-- ⬜ **Tmux split vertical** - Split current pane vertically
-- 📐 **Tmux layout** - Multi-pane with layout chooser
-- 🎯 **Current pane** - Replace current pane (detach on exit)
-
-### 4. Context Awareness
-
-**Inside tmux:**
-- Default to tmux splits/windows
-- Offer session switching
-- Detect current session/window
-
-**Outside tmux:**
-- Create new tmux session for multi-launch
-- Fall back to xterm windows
-- Auto-attach to created sessions
-
-### 5. Configuration System
-
-YAML-based config at `~/.config/tui-launcher/config.yaml`
-
-```yaml
-projects:
-  - name: TFE
-    icon: 🚀
-    path: ~/projects/tfe
-    commands:
-      - name: TFE
-        icon: 📂
-        command: tfe
-        spawn: tmux-split-h
-      - name: Dev Server
-        icon: 💻
-        command: go run .
-        spawn: tmux-split-v
-
-    profiles:
-      - name: Dev Environment
-        icon: 🔧
-        layout: main-vertical
-        panes:
-          - command: tfe
-          - command: go run .
-          - command: tail -f logs/debug.log
-
-tools:
-  - category: System Monitoring
-    icon: 📊
-    items:
-      - name: htop
-        icon: 💹
-        command: htop
-        spawn: tmux-split-v
-
-ai:
-  - name: Claude Code
-    icon: 💬
-    command: claude
-    spawn: tmux-split-h
-```
-
-### 6. TFE Integration
-
-Add to TFE's context menu (`~/.config/tfe/tools.yaml`):
-```yaml
-tools:
-  - name: "Launch Environment"
-    command: "tui-launcher --project {{file}}"
-    icon: "🚀"
-    showFor: "directories"
-```
-
-Right-click project folder in TFE → Launch Environment → Opens launcher focused on that project!
-
----
-
-## Architecture
-
-### File Structure
-```
-tui-launcher/
-├── main.go               # Entry point (minimal)
-├── types.go              # Type definitions
-├── model.go              # Model initialization
-├── update.go             # Update dispatcher
-├── update_keyboard.go    # Keyboard handling
-├── update_mouse.go       # Mouse handling
-├── view.go               # View rendering
-├── styles.go             # Lipgloss styles
-├── config.go             # Config loading/parsing
-├── tree.go               # Tree building/rendering
-├── spawn.go              # Spawn logic (tmux/xterm)
-├── dialog.go             # Spawn dialog UI
-├── helpers.go            # Utility functions
-├── go.mod
-├── PLAN.md              # This file
-└── README.md
-```
-
-### Key Types
-
-```go
-type launchItem struct {
-    name         string
-    path         string      // Unique identifier
-    itemType     itemType    // category, command, profile
-    icon         string
-    command      string
-    cwd          string      // Working directory
-    defaultSpawn spawnMode
-    children     []launchItem // For categories
-
-    // For profiles
-    isProfile    bool
-    layout       tmuxLayout
-    panes        []paneConfig
-}
-
-type itemType int
-const (
-    typeCategory itemType = iota  // Expandable folder
-    typeCommand                    // Single executable
-    typeProfile                    // Multi-launch config
-)
-
-type spawnMode int
-const (
-    spawnXtermWindow spawnMode = iota
-    spawnTmuxWindow
-    spawnTmuxSplitH
-    spawnTmuxSplitV
-    spawnTmuxLayout
-    spawnCurrentPane
-)
-
-type tmuxLayout int
-const (
-    layoutMainVertical tmuxLayout = iota
-    layoutMainHorizontal
-    layoutTiled
-    layoutEvenHorizontal
-    layoutEvenVertical
-)
-
-type launchTreeItem struct {
-    item        launchItem
-    depth       int
-    isLast      bool
-    parentLasts []bool
-}
-
-type model struct {
-    // Display
-    width, height     int
-    cursor            int
-
-    // Tree state
-    items             []launchItem
-    treeItems         []launchTreeItem
-    expandedItems     map[string]bool
-
-    // Selection
-    selectedItems     map[string]bool
-
-    // Spawn dialog
-    showSpawnDialog   bool
-    selectedLayout    tmuxLayout
-
-    // Config
-    config            Config
-}
-```
-
----
-
-## Implementation Phases
-
-### Phase 1: Core Tree View (In Progress)
-**Goal:** Basic tree navigation with TFE patterns
-
-- [x] Project structure
-- [x] Type definitions (`types.go`)
-- [x] Emoji constants (no variation selectors!)
-- [ ] **Config loading (YAML) - NEXT**
-- [ ] Port `treeItem` structure from TFE
-- [ ] Port `buildTreeItems()` logic
-- [ ] Port `renderTreeView()` with emoji width handling
-- [ ] Basic keyboard navigation (arrows, enter, esc)
-- [ ] Expand/collapse categories
-
-**Files:** `types.go` ✅, `tree.go`, `config.go` 🎯, `update_keyboard.go`, `view.go`
-
-#### Config Loading Implementation Plan
-
-**Goal:** Load YAML config and convert to `launchItem` tree structure
-
-**Step 1: YAML Parsing (`config.go`)**
-```go
-func loadConfig() (Config, error) {
-    // 1. Get config path: ~/.config/tui-launcher/config.yaml
-    configPath := filepath.Join(os.Getenv("HOME"), ".config/tui-launcher/config.yaml")
-
-    // 2. Check if file exists, create default if not
-    if !fileExists(configPath) {
-        return createDefaultConfig(configPath)
-    }
-
-    // 3. Read and parse YAML
-    data, err := os.ReadFile(configPath)
-    if err != nil {
-        return Config{}, fmt.Errorf("failed to read config: %w", err)
-    }
-
-    var config Config
-    if err := yaml.Unmarshal(data, &config); err != nil {
-        return Config{}, fmt.Errorf("failed to parse config: %w", err)
-    }
-
-    return config, nil
-}
-```
-
-**Step 2: Convert Config to Launch Items**
-```go
-func buildLaunchItemsFromConfig(config Config) []launchItem {
-    items := []launchItem{}
-
-    // 1. Projects section (top-level categories)
-    for _, proj := range config.Projects {
-        projectItem := launchItem{
-            Name:     proj.Name,
-            Path:     "projects/" + proj.Name,
-            ItemType: typeCategory,
-            Icon:     proj.Icon,
-            Children: []launchItem{},
-        }
-
-        // Add commands as children
-        for _, cmd := range proj.Commands {
-            projectItem.Children = append(projectItem.Children, launchItem{
-                Name:         cmd.Name,
-                Path:         "projects/" + proj.Name + "/" + cmd.Name,
-                ItemType:     typeCommand,
-                Icon:         cmd.Icon,
-                Command:      cmd.Command,
-                Cwd:          resolvePath(cmd.Cwd, proj.Path),
-                DefaultSpawn: parseSpawnMode(cmd.Spawn),
-            })
-        }
-
-        // Add profiles as children
-        for _, profile := range proj.Profiles {
-            projectItem.Children = append(projectItem.Children, launchItem{
-                Name:      profile.Name,
-                Path:      "projects/" + proj.Name + "/" + profile.Name,
-                ItemType:  typeProfile,
-                Icon:      profile.Icon,
-                IsProfile: true,
-                Layout:    parseLayout(profile.Layout),
-                Panes:     profile.Panes,
-            })
-        }
-
-        items = append(items, projectItem)
-    }
-
-    // 2. Tools section
-    for _, cat := range config.Tools {
-        categoryItem := buildCategoryItem("tools", cat)
-        items = append(items, categoryItem)
-    }
-
-    // 3. AI section
-    aiCategory := launchItem{
-        Name:     "AI Commands",
-        Path:     "ai",
-        ItemType: typeCategory,
-        Icon:     emojiAI,
-        Children: []launchItem{},
-    }
-    for _, cmd := range config.AI {
-        aiCategory.Children = append(aiCategory.Children, buildCommandItem("ai", cmd))
-    }
-    items = append(items, aiCategory)
-
-    // 4. Scripts section
-    for _, cat := range config.Scripts {
-        categoryItem := buildCategoryItem("scripts", cat)
-        items = append(items, categoryItem)
-    }
-
-    return items
-}
-```
-
-**Step 3: Helper Functions**
-```go
-// parseSpawnMode converts string to spawnMode enum
-func parseSpawnMode(s string) spawnMode {
-    switch s {
-    case "tmux-split-h":
-        return spawnTmuxSplitH
-    case "tmux-split-v":
-        return spawnTmuxSplitV
-    case "tmux-window":
-        return spawnTmuxWindow
-    case "xterm-window":
-        return spawnXtermWindow
-    case "current-pane":
-        return spawnCurrentPane
-    default:
-        // Auto-detect: tmux split if in tmux, else xterm
-        return spawnTmuxSplitH
-    }
-}
-
-// parseLayout converts string to tmuxLayout enum
-func parseLayout(s string) tmuxLayout {
-    switch s {
-    case "main-vertical":
-        return layoutMainVertical
-    case "main-horizontal":
-        return layoutMainHorizontal
-    case "tiled":
-        return layoutTiled
-    case "even-horizontal":
-        return layoutEvenHorizontal
-    case "even-vertical":
-        return layoutEvenVertical
-    default:
-        return layoutMainVertical
-    }
-}
-
-// resolvePath resolves relative paths, handles empty strings
-func resolvePath(cmdPath, projectPath string) string {
-    if cmdPath != "" {
-        return expandHome(cmdPath)
-    }
-    if projectPath != "" {
-        return expandHome(projectPath)
-    }
-    return os.Getenv("HOME")
-}
-
-// expandHome replaces ~ with home directory
-func expandHome(path string) string {
-    if strings.HasPrefix(path, "~/") {
-        return filepath.Join(os.Getenv("HOME"), path[2:])
-    }
-    return path
-}
-```
-
-**Step 4: Default Config Creation**
-```go
-func createDefaultConfig(configPath string) (Config, error) {
-    // Create config directory
-    configDir := filepath.Dir(configPath)
-    if err := os.MkdirAll(configDir, 0755); err != nil {
-        return Config{}, err
-    }
-
-    // Write default config (minimal example)
-    defaultYAML := `# TUI Launcher Configuration
-
-projects:
-  - name: Example Project
-    icon: 📦
-    path: ~/projects/example
-    commands:
-      - name: Open TFE
-        icon: 📂
-        command: tfe
-        spawn: tmux-split-h
-
-tools:
-  - category: System
-    icon: 📊
-    items:
-      - name: htop
-        icon: 💹
-        command: htop
-        spawn: tmux-split-v
-`
-
-    if err := os.WriteFile(configPath, []byte(defaultYAML), 0644); err != nil {
-        return Config{}, err
-    }
-
-    // Parse and return it
-    var config Config
-    yaml.Unmarshal([]byte(defaultYAML), &config)
-    return config, nil
-}
-```
-
-**Step 5: Integration with Model**
-```go
-// In model.go: initialModel()
-func initialModel() model {
-    // Load config
-    config, err := loadConfig()
-    if err != nil {
-        // Handle error (show in UI)
-        config = Config{} // Empty config
-    }
-
-    // Convert to launch items
-    items := buildLaunchItemsFromConfig(config)
-
-    return model{
-        items:         items,
-        config:        config,
-        expandedItems: make(map[string]bool),
-        selectedItems: make(map[string]bool),
-        // ... other fields
-    }
-}
-```
-
-**Testing:**
-```bash
-# Should create default config if missing
-rm ~/.config/tui-launcher/config.yaml
-./tui-launcher  # Creates default config.yaml
-
-# Should parse existing config
-./tui-launcher  # Loads from config.yaml
-```
-
-**Error Handling:**
-- File not found → Create default config
-- Parse error → Show error message in UI, continue with empty config
-- Missing fields → Use sensible defaults (empty string, HOME dir, etc.)
-
-**Files to Create:**
-- `config.go` - All config loading logic
-- `helpers.go` - Path helpers, string utils
-
-### Phase 2: Multi-Select System
-**Goal:** Space to select, visual indicators
-
-- [ ] Selection state tracking (`selectedItems` map)
-- [ ] Space key to toggle selection
-- [ ] Checkbox rendering (☐/☑)
-- [ ] Visual feedback (highlight selected items)
-- [ ] Selection count in status bar
-- [ ] Clear selections (Esc)
-- [ ] Select all in category (a)
-
-**Files:** `update_keyboard.go`, `tree.go`, `view.go`
-
-### Phase 3: Single Spawn Logic ✅ COMPLETED
-**Goal:** Launch individual commands
-
-- [x] Detect if inside tmux (`$TMUX` env var) - `insideTmux()`
-- [x] Spawn in tmux split horizontal - `tmuxSplitHorizontal()`
-- [x] Spawn in tmux split vertical - `tmuxSplitVertical()`
-- [x] Spawn in tmux new window - `tmuxNewWindow()`
-- [x] Spawn in xterm window - `xtermWindow()`
-- [x] Set working directory per command - All functions support `item.Cwd`
-- [x] Default spawn mode per item - `item.DefaultSpawn`
-
-**Files:** `spawn.go` ✅
-
-**Implementation Notes:**
-- Uses tmuxplexer's proven pattern: create all panes first, then apply layout
-- 10ms delay between pane creation for stability
-- Supports per-pane working directories
-- Auto-generates unique session names with timestamps
-- Context-aware: adapts to inside/outside tmux
-
-### Phase 4: Multi-Spawn Dialog
-**Goal:** Batch launches with layout selection
-
-- [ ] Spawn dialog UI
-- [ ] Layout picker (arrow keys)
-- [ ] Show selected items list
-- [ ] Preview layout visually (ASCII art)
-- [ ] Confirm/cancel
-- [ ] Multi-spawn execution
-- [ ] Apply tmux layout after spawning
-
-**Files:** `dialog.go`, `spawn.go`, `view.go`
-
-### Phase 5: Profile Support
-**Goal:** Saved multi-pane configurations
-
-- [ ] Profile type in config
-- [ ] Profile rendering in tree
-- [ ] Launch profile (create session + panes + layout)
-- [ ] Session naming
-- [ ] Auto-attach to created session
-
-**Files:** `config.go`, `spawn.go`, `tree.go`
-
-### Phase 6: Polish & Features
-**Goal:** Production-ready launcher
-
-- [ ] Mouse support (click to select/expand)
-- [ ] Favorites system (star items)
-- [ ] Recent launches (history)
-- [ ] Search/filter (Ctrl+F)
-- [ ] Command-line args (`--project`, `--tool`)
-- [ ] TFE integration example
-- [ ] Error handling (command not found, etc.)
-- [ ] Session management (list, kill, switch)
-
-**Files:** `update_mouse.go`, `favorites.go`, `search.go`, `main.go`
-
-### Phase 7: Documentation
-**Goal:** Usable by others
-
-- [ ] README with screenshots
-- [ ] Config examples
-- [ ] Keyboard shortcuts reference
-- [ ] Integration guide (TFE, tmux, etc.)
-- [ ] Installation instructions
-- [ ] Example configs for common workflows
-
-**Files:** `README.md`, `HOTKEYS.md`, `examples/`
-
----
-
-## Emoji System
-
-**Critical:** NO variation selectors (U+FE0F)!
-(Learned from TFE - causes width calculation bugs in go-runewidth)
-
-### Icons Used
-```go
-// Spawn modes
-emojiXtermWindow    = "🪟"  // U+1FA9F
-emojiTmuxWindow     = "🔲"  // U+1F532
-emojiTmuxSplitH     = "⬛"  // U+2B1B
-emojiTmuxSplitV     = "⬜"  // U+2B1C
-emojiTmuxLayout     = "📐"  // U+1F4D0
-emojiCurrentPane    = "🎯"  // U+1F3AF
-emojiBatchSpawn     = "🎛"  // U+1F39B (NO U+FE0F!)
-
-// Item types
-emojiProject        = "📦"  // U+1F4E6
-emojiFolder         = "📁"  // U+1F4C1
-emojiCommand        = "⚡"  // U+26A1
-emojiProfile        = "🔧"  // U+1F527
-emojiTUITool        = "🛠"  // U+1F6E0 (NO U+FE0F!)
-emojiAI             = "🤖"  // U+1F916
-emojiScript         = "📜"  // U+1F4DC
-emojiFavorite       = "⭐"  // U+2B50
-
-// Status
-emojiExpanded       = "▼"   // U+25BC
-emojiCollapsed      = "▶"   // U+25B6
-emojiSelected       = "☑"   // U+2611
-emojiUnselected     = "☐"   // U+2610
-```
-
-**Validation:**
-```bash
-echo -n "🛠" | xxd  # Should NOT see efb88f (U+FE0F)
-```
-
----
-
-## Key Interactions
-
-### Navigation
-- **↑/↓**: Move cursor
-- **→**: Expand category
-- **←**: Collapse category
-- **Home**: Jump to top
-- **End**: Jump to bottom
-- **PgUp/PgDn**: Page up/down
-
-### Selection
-- **Space**: Toggle selection at cursor
-- **a**: Select all in current category
-- **c**: Clear all selections
-- **Esc**: Clear selections (or close dialog)
-
-### Launching
-- **Enter**: Launch (single or show dialog for multi)
-- **Ctrl+Enter**: Quick multi-launch (skip dialog, use default layout)
-- **s**: Show spawn options for current item
-- **p**: Launch as profile (if item is profile)
-
-### Dialog Navigation
-- **↑/↓**: Select layout option
-- **Enter**: Confirm launch
-- **Esc**: Cancel
-
----
-
-## Technical Patterns from TFE
-
-### 1. Emoji Width Handling
-```go
-// Port from TFE's render_file_list.go
-func (m model) runeWidth(r rune) int {
-    if r >= 0xFE00 && r <= 0xFE0F { // Variation selectors
-        if m.terminalType == terminalWindowsTerminal {
-            return 1
-        }
-        return 0
-    }
-    return runewidth.RuneWidth(r)
-}
-```
-
-### 2. Tree Building (Recursive)
-```go
-// Port from TFE's buildTreeItems
-func (m model) buildLaunchTree(items []launchItem, depth int, parentLasts []bool) []launchTreeItem {
-    treeItems := []launchTreeItem{}
-
-    for i, item := range items {
-        isLast := i == len(items)-1
-
-        // Add current item
-        treeItems = append(treeItems, launchTreeItem{
-            item:        item,
-            depth:       depth,
-            isLast:      isLast,
-            parentLasts: append([]bool{}, parentLasts...),
-        })
-
-        // Recursively add children if expanded
-        if item.itemType == typeCategory && m.expandedItems[item.path] {
-            newParentLasts := append(parentLasts, isLast)
-            children := m.buildLaunchTree(item.children, depth+1, newParentLasts)
-            treeItems = append(treeItems, children...)
-        }
-    }
-
-    return treeItems
-}
-```
-
-### 3. Config System
-```go
-// Similar to TFE's config.go
-type Config struct {
-    Projects []ProjectConfig `yaml:"projects"`
-    Tools    []CategoryConfig `yaml:"tools"`
-    AI       []CommandConfig `yaml:"ai"`
-    Scripts  []CategoryConfig `yaml:"scripts"`
-}
-
-func loadConfig() (Config, error) {
-    configPath := filepath.Join(os.Getenv("HOME"), ".config/tui-launcher/config.yaml")
-    data, err := os.ReadFile(configPath)
-    // ... parse YAML
-}
-```
-
----
-
-## Example Usage Flows
-
-### Flow 1: Quick Single Launch
-1. Open launcher: `tui-launcher`
-2. Navigate to "TFE" with arrow keys
-3. Press Enter → TFE launches in tmux split
-
-### Flow 2: Multi-Select Batch Launch
-1. Navigate to "MyApp" project
-2. Space on "TFE" → ☑
-3. Space on "npm run dev" → ☑
-4. Space on "tail -f logs/app.log" → ☑
-5. Press Enter → Spawn dialog appears
-6. Select layout: `main-vertical`
-7. Press Enter → Launches all 3 in tmux layout
-
-Result:
-```
-┌──────────┬───────────────┐
-│          │ npm run dev   │
-│   TFE    ├───────────────┤
-│          │ tail -f logs  │
-└──────────┴───────────────┘
-```
-
-### Flow 3: Launch Profile
-1. Navigate to "Dev Environment" (profile icon 🔧)
-2. Press Enter → Entire dev environment spawns with saved layout
-3. Auto-switches to new tmux session
-
-### Flow 4: From TFE Integration
-1. In TFE, navigate to project folder
-2. Right-click → "Launch Environment"
-3. Launcher opens pre-focused on that project
-4. Quick select tools → batch launch
-
----
-
-## Success Metrics
-
-**Must Have:**
-- ✅ Tree navigation smooth in Termux
-- ✅ Multi-select works intuitively
-- ✅ Batch tmux launches work correctly
-- ✅ Config loads from YAML
-- ✅ Working directory set properly per command
-
-**Should Have:**
-- Profiles save time vs manual setup
-- Mouse support for convenience
-- TFE integration is seamless
-- Error messages are helpful
-
-**Nice to Have:**
-- Session management (list/kill/switch)
-- Command history/favorites
-- Fuzzy search for items
-- Custom keybindings
-
----
-
 ## Current Status
 
-**Phase:** MVP COMPLETE! ✅ 🎉
+**Version:** 0.2.0-dev (in progress)
+**Last Updated:** 2025-01-19
 
-**Completed Features:**
+### ✅ Completed (v0.1.0 - MVP)
+See [CHANGELOG.md](CHANGELOG.md) for full details of completed features:
+- Core tree view navigation with multi-select
+- Tmux spawn logic with multiple modes
+- YAML configuration system
+- Profile support for multi-pane setups
+- Keyboard/mouse navigation
+- Wrapper script (`tl`) for global access
 
-### Phase 1: Core Tree View ✅
-- ✅ Project structure and types (`types.go`)
-- ✅ YAML config loading with gopkg.in/yaml.v3 (`model.go`)
-- ✅ Tree building from config (`tree.go`)
-- ✅ Tree rendering with proper indentation and icons
-- ✅ Expand/collapse categories with Space/→/←
-- ✅ Keyboard navigation (↑/↓, vim keys k/j)
-- ✅ Mouse wheel scrolling support
-- ✅ Working directory display in header
-- ✅ Bold text for cursor selection (lipgloss)
+### 🚧 In Progress (v0.2.0)
 
-### Phase 2: Multi-Select System ✅
-- ✅ Space key toggle selection (context-aware)
-- ✅ Checkbox rendering (☐/☑)
-- ✅ Selection count in status bar
-- ✅ Clear selections (c key)
-- ✅ Visual feedback for selected items
+#### 3-Pane Responsive Layout System
+Implementing a responsive layout that adapts to terminal size:
 
-### Phase 3: Spawn Logic ✅
-- ✅ Single command launch
-- ✅ Batch multi-select launch with layouts
-- ✅ Tmux integration (splits, windows)
-- ✅ Profile support (multi-pane configs)
-- ✅ Working directory handling per command
-- ✅ Toggle mode: Tmux vs Direct execution (t key)
-- ✅ Auto-clear selections after launch
-
-### UI Polish ✅
-- ✅ Animated footer scrolling (unicode-safe)
-- ✅ Context-aware spacebar (expand categories OR select commands)
-- ✅ Clean spawn mode display (hidden from tree)
-- ✅ Proper unicode handling for scrolling text
-- ✅ Responsive layout adjustments
-
-### Configuration ✅
-- ✅ Full config with 30+ real tools
-- ✅ Organized categories (Git, AI, Entertainment, etc.)
-- ✅ Project-specific commands with working directories
-- ✅ Clean YAML structure
-
-**Next Steps:**
-
-### 1. Bash Wrapper & Global Alias
-**Goal:** Make launcher accessible from anywhere with a short command
-
-```bash
-# Create wrapper script
-cat > ~/.local/bin/tl << 'EOF'
-#!/bin/bash
-# TUI Launcher wrapper - run from any directory
-~/.local/bin/tui-launcher "$@"
-EOF
-
-chmod +x ~/.local/bin/tl
+**Desktop Mode** (≥80 width, >12 height):
+```
+┌──────────────────┬──────────────────┐
+│ Global Tools     │ Projects         │
+│ ├─ Git           │ ├─ TUI Launcher  │
+│ └─ AI            │ └─ TKan          │
+├──────────────────┴──────────────────┤
+│ Info: lazygit                       │
+│ Terminal UI for git commands        │
+└─────────────────────────────────────┘
 ```
 
-**Suggested aliases:**
-- `tl` - Short for "TUI Launcher"
-- `launch` - Descriptive
-- `tui` - Generic TUI tool launcher
-
-**Add to shell config:**
-```bash
-# In ~/.bashrc or ~/.zshrc
-export PATH="$HOME/.local/bin:$PATH"
-alias tl='~/.local/bin/tui-launcher'
+**Compact Mode** (<80 width) - Termux landscape:
+```
+┌────────────────────────────────────┐
+│ Global Tools / Projects (Tab)      │
+├────────────────────────────────────┤
+│ Info pane                          │
+└────────────────────────────────────┘
 ```
 
-**Usage:**
-```bash
-# From anywhere:
-tl                    # Opens launcher
-tl --help             # Show help (future)
-tl --project tkan     # Open focused on project (future)
+**Mobile Mode** (≤12 height) - Termux with keyboard:
+```
+┌────────────────────────────────────┐
+│ Tree only (press 'i' for info)    │
+└────────────────────────────────────┘
 ```
 
-### 2. Installation Script (Optional)
-Create `install.sh` for easy setup:
-```bash
-#!/bin/bash
-# Build and install tui-launcher
-cd "$(dirname "$0")"
-go build -o tui-launcher
-mkdir -p ~/.local/bin
-cp tui-launcher ~/.local/bin/
-chmod +x ~/.local/bin/tui-launcher
+**Status:** Implementation in progress by tt-cc-ofc session
+**Files:** See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed steps
 
-# Create alias wrapper
-cat > ~/.local/bin/tl << 'EOF'
-#!/bin/bash
-~/.local/bin/tui-launcher "$@"
-EOF
-chmod +x ~/.local/bin/tl
+---
 
-echo "✅ Installed to ~/.local/bin/tui-launcher"
-echo "✅ Created alias: tl"
-echo ""
-echo "Add to your shell config:"
-echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-```
+## Roadmap
 
-### 3. Documentation Updates
+### v0.2.0 - Responsive 3-Pane Layout (Current)
+- [ ] 3-pane layout for desktop (Global | Projects | Info)
+- [ ] Responsive breakpoints for Termux compatibility
+- [ ] Info pane with markdown file support
+- [ ] Tab navigation between panes
+- [ ] 'i' key to toggle info in mobile mode
+- [ ] Update config schema for item descriptions and info files
+
+### v0.3.0 - Documentation & Polish
 - [ ] Update README with installation instructions
 - [ ] Add keybindings reference
 - [ ] Screenshot/demo GIF
-- [ ] Config examples
+- [ ] Config examples for common workflows
+- [ ] TFE integration example
+- [ ] Installation script (`install.sh`)
 
-**Blockers:** None
-
-**Notes:**
-- Leveraging TUITemplate architecture ✅
-- Reusing proven patterns from TFE (tree view) ✅
-- Reusing tmuxplexer spawn patterns ✅
-- Unicode handling fixed for smooth scrolling ✅
-- Ready for daily use! 🚀
+### v0.4.0 - Enhanced Features
+- [ ] Favorites system (star items)
+- [ ] Recent launches (history)
+- [ ] Search/filter (Ctrl+F or /)
+- [ ] Command-line args (`--project`, `--tool`)
+- [ ] Session management (list, kill, switch)
+- [ ] Error handling improvements
 
 ---
 
 ## Future Ideas (Post v1.0)
 
+### Advanced Features
 - **Remote spawning** - SSH into servers and spawn there
 - **Docker integration** - Launch containers with tmux inside
 - **Command templates** - Variables in commands ({{project}}, {{branch}})
 - **Conditional commands** - Only show if file/dir exists
 - **Status indicators** - Show if process is running (🟢/🔴)
 - **Web UI** - Launch via browser (for remote access)
-- **AI integration** - Ask Claude to generate launch configs
+
+### AI Integration
+- **AI config generation** - Ask Claude to generate launch configs
+- **Smart suggestions** - Recommend commands based on context
+- **Natural language** - "Launch dev environment for TKan"
+
+### Collaboration
 - **Export/import** - Share configs with team
+- **Team profiles** - Shared workspace configurations
+- **Config sync** - Sync across machines
 
 ---
 
-**Last Updated:** 2025-01-19
-**Status:** Planning Complete, Ready to Build! 🚀
+## Architecture Overview
+
+### File Structure
+```
+tui-launcher/
+├── main.go               # Entry point
+├── types.go              # Type definitions
+├── model.go              # Model initialization
+├── tree.go               # Tree building/rendering
+├── spawn.go              # Spawn logic (tmux/xterm)
+├── layouts.go            # Tmux layout definitions
+├── go.mod
+├── PLAN.md              # This file
+├── CHANGELOG.md         # Version history
+├── IMPLEMENTATION_PLAN.md  # 3-pane layout details
+├── CLAUDE.md            # Instructions for Claude Code
+└── README.md
+```
+
+### Core Principles
+- **MVU Pattern**: Model-View-Update (Bubble Tea)
+- **Responsive Design**: Adapt to terminal size (Golden Rules)
+- **Separation of Concerns**: Global tools vs project commands
+- **Proven Patterns**: Reuse from TFE (tree view) and tmuxplexer (spawn)
+- **Mobile First**: Optimize for Termux alongside desktop
+
+---
+
+## Configuration System
+
+YAML-based config at `~/.config/tui-launcher/config.yaml`
+
+### Current Schema (v0.1.0)
+```yaml
+projects:
+  - name: Project Name
+    icon: 🚀
+    path: ~/projects/project-name
+    commands:
+      - name: Command Name
+        icon: 📂
+        command: command to run
+        cwd: ~/specific/directory  # Optional
+        spawn: tmux-split-h        # Optional
+    profiles:
+      - name: Profile Name
+        icon: 🔧
+        layout: main-vertical
+        panes:
+          - command: command1
+          - command: command2
+
+tools:
+  - category: Category Name
+    icon: 🔧
+    items:
+      - name: Tool Name
+        icon: 🎯
+        command: tool-command
+        spawn: tmux-window
+```
+
+### Planned Schema (v0.2.0)
+Add info/documentation support:
+```yaml
+tools:
+  - category: Git
+    icon: 🔧
+    items:
+      - name: lazygit
+        icon: 🎯
+        command: lazygit
+        description: "Terminal UI for git commands"
+        info_file: ~/.config/tui-launcher/docs/lazygit.md
+        repo: "https://github.com/jesseduffield/lazygit"
+```
+
+---
+
+## Development Workflow
+
+### Building & Testing
+```bash
+# Build
+go build
+
+# Run locally
+./tui-launcher
+
+# Install globally
+go build -o tui-launcher && cp tui-launcher ~/.local/bin/
+
+# Update dependencies
+go mod tidy
+```
+
+### Using with Wrapper
+The `tl` wrapper at `~/.local/bin/tl` calls the binary. Always rebuild and copy after changes:
+```bash
+go build -o tui-launcher && cp tui-launcher ~/.local/bin/
+```
+
+### Skills & Documentation
+- `.claude/skills/bubbletea/` - TUI development patterns
+- `IMPLEMENTATION_PLAN.md` - Detailed implementation steps
+- `CHANGELOG.md` - Version history
+
+---
+
+## Success Metrics
+
+**Must Have (v0.2.0):**
+- ✅ 3-pane layout works on desktop
+- ✅ Responsive layout works in Termux
+- ✅ Info pane shows helpful content
+- ✅ No visual glitches (borders align, no overflow)
+- ✅ All existing functionality preserved
+
+**Should Have (v0.3.0):**
+- Documentation is clear and complete
+- Installation is easy (one script)
+- Examples cover common use cases
+
+**Nice to Have (v0.4.0+):**
+- Search/filter for quick access
+- Favorites for most-used commands
+- Command history tracking
+- TFE integration seamless
+
+---
+
+**Status:** Active Development
+**Contributors:** matt, Claude Code
+**License:** MIT
