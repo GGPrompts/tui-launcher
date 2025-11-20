@@ -69,7 +69,6 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		loadConfig,
-		footerTick(),
 	)
 }
 
@@ -424,16 +423,78 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		switch msg.Type {
+		case tea.MouseLeft:
+			// Click to switch panes in desktop mode
+			// GOLDEN RULE #3: Match mouse detection to layout (X for horizontal split)
+			mode := m.getLayoutMode()
+			if mode == layoutDesktop {
+				leftWidth, _, _, _ := m.calculateLayout()
+				// Header is 3 lines tall
+				if msg.Y > 3 {
+					if msg.X < leftWidth {
+						m.activePane = paneGlobal
+					} else {
+						m.activePane = paneProject
+					}
+					m.updateInfoPane()
+				}
+			}
+
 		case tea.MouseWheelUp:
-			// Scroll up
-			if m.cursor > 0 {
-				m.cursor--
+			// Scroll up in active pane
+			mode := m.getLayoutMode()
+			if mode == layoutDesktop {
+				if m.activePane == paneGlobal {
+					if m.globalCursor > 0 {
+						m.globalCursor--
+					}
+				} else {
+					if m.projectCursor > 0 {
+						m.projectCursor--
+					}
+				}
+			} else {
+				// Compact/mobile mode
+				if m.showingProjects {
+					if m.projectCursor > 0 {
+						m.projectCursor--
+					}
+				} else {
+					if m.globalCursor > 0 {
+						m.globalCursor--
+					}
+				}
 			}
+			// Update info pane after scrolling
+			m.updateInfoPane()
+
 		case tea.MouseWheelDown:
-			// Scroll down
-			if m.cursor < len(m.treeItems)-1 {
-				m.cursor++
+			// Scroll down in active pane
+			mode := m.getLayoutMode()
+			if mode == layoutDesktop {
+				if m.activePane == paneGlobal {
+					if m.globalCursor < len(m.globalTreeItems)-1 {
+						m.globalCursor++
+					}
+				} else {
+					if m.projectCursor < len(m.projectTreeItems)-1 {
+						m.projectCursor++
+					}
+				}
+			} else {
+				// Compact/mobile mode
+				if m.showingProjects {
+					if m.projectCursor < len(m.projectTreeItems)-1 {
+						m.projectCursor++
+					}
+				} else {
+					if m.globalCursor < len(m.globalTreeItems)-1 {
+						m.globalCursor++
+					}
+				}
 			}
+			// Update info pane after scrolling
+			m.updateInfoPane()
 		}
 
 	case tea.WindowSizeMsg:
@@ -470,11 +531,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-
-	case footerTickMsg:
-		// Increment footer scroll offset
-		m.footerOffset++
-		return m, footerTick()
 	}
 
 	return m, nil
@@ -788,17 +844,22 @@ func (m model) View() string {
 		sb.WriteString(fmt.Sprintf("Selected: %d items | ", len(m.selectedItems)))
 	}
 
-	// Footer (adapts to layout mode)
+	// Footer (adapts to layout mode) - static, no scrolling to prevent flashing
 	var footerText string
 	switch mode {
 	case layoutDesktop:
-		footerText = "↑/↓: navigate  Tab: switch panes  Space: expand/select  Enter: launch  e: edit  c: clear  t: mode  q: quit"
+		footerText = "↑/↓: nav  Tab: panes  Space: expand/select  Enter: launch  e: edit  c: clear  q: quit"
 	case layoutCompact:
-		footerText = "↑/↓: navigate  Tab: switch (Global/Projects)  Space: select  Enter: launch  e: edit  c: clear  q: quit"
+		footerText = "↑/↓: nav  Tab: switch  Space: select  Enter: launch  e: edit  c: clear  q: quit"
 	case layoutMobile:
-		footerText = "↑/↓: navigate  Tab: switch  i: toggle info  Space: select  Enter: launch  q: quit"
+		footerText = "↑/↓: nav  Tab: switch  i: info  Space: select  Enter: launch  q: quit"
 	}
-	sb.WriteString(renderScrollingFooter(footerText, m.width, m.footerOffset))
+
+	// Truncate footer if needed (no scrolling)
+	if len(footerText) > m.width-2 {
+		footerText = footerText[:m.width-5] + "..."
+	}
+	sb.WriteString(footerText)
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -1094,6 +1155,9 @@ func (m model) calculateLayout() (int, int, int, int) {
 
 	// Subtract header (3 lines: title + cwd + blank)
 	contentHeight -= 3
+
+	// Subtract footer area (2 lines: status line + footer)
+	contentHeight -= 2
 
 	// GOLDEN RULE #1: Account for borders BEFORE rendering
 	// Subtract 2 for panel borders (top + bottom)
