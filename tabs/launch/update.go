@@ -109,9 +109,9 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Clear all selections
 		m.selectedItems = make(map[string]bool)
 
-	case "t":
-		// Toggle tmux/xterm mode
-		m.useTmux = !m.useTmux
+	case "d":
+		// Toggle detached mode (spawn in tmux vs foreground)
+		m.detachedMode = !m.detachedMode
 
 	case "e":
 		// Edit config file
@@ -119,11 +119,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// If inside tmux, spawn editor in a new split
 			return m, editConfigInTmux()
 		} else {
-			// Otherwise quit and open editor
-			return m, tea.Sequence(
-				tea.Quit,
-				editConfig,
-			)
+			// Use ExecProcess to properly handle the editor
+			return m, editConfigExec()
 		}
 
 	case "enter":
@@ -440,23 +437,27 @@ func (m Model) handleEnterKey() (Model, tea.Cmd) {
 			}
 
 			if len(itemsToLaunch) > 0 {
-				// Use default layout for batch launch
-				return m, spawnMultiple(itemsToLaunch, m.selectedLayout)
+				// Multi-select
+				if m.detachedMode {
+					// Detached: Spawn each in background, stay in launcher
+					return m, spawnMultipleDetached(itemsToLaunch)
+				} else {
+					// Foreground: Spawn each as tmux window, exit launcher
+					// User lands in tmux with multiple windows to switch between
+					return m, spawnMultipleForeground(itemsToLaunch)
+				}
 			}
 
 		} else {
 			// No selection - launch current item if it's a command or profile
 			if currentItem.ItemType == typeCommand {
-				// Launch single command
-				if !m.useTmux {
-					// Non-tmux mode: run command directly in current terminal
-					return m, tea.Sequence(
-						tea.Quit,
-						runCommandDirectly(currentItem),
-					)
+				// Check if detached mode is enabled
+				if m.detachedMode {
+					// Spawn in tmux window (background/detached)
+					return m, spawnInTmuxWindow(currentItem)
 				} else {
-					// Tmux mode: use configured spawn mode
-					return m, spawnSingle(currentItem, currentItem.DefaultSpawn)
+					// Launch in foreground (like TFE)
+					return m, runCommandDirectly(currentItem)
 				}
 
 			} else if currentItem.ItemType == typeProfile {
@@ -552,6 +553,61 @@ func editConfig() tea.Msg {
 	return nil
 }
 
+// editConfigExec returns a command to edit the config file using tea.ExecProcess
+func editConfigExec() tea.Cmd {
+	return func() tea.Msg {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+
+		configPath := filepath.Join(homeDir, ".config", "tui-launcher", "config.yaml")
+
+		// Get editor from environment, fallback to sensible defaults
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = os.Getenv("VISUAL")
+		}
+		if editor == "" {
+			// Check which editors are available (micro is first since it's user-friendly)
+			for _, e := range []string{"micro", "nano", "vim", "vi"} {
+				if _, err := exec.LookPath(e); err == nil {
+					editor = e
+					break
+				}
+			}
+		}
+		if editor == "" {
+			// No editor found
+			return nil
+		}
+
+		c := exec.Command(editor, configPath)
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+
+		// Use TFE's proven pattern: ClearScreen + ExecProcess + Sequence()
+		return tea.Sequence(
+			tea.ClearScreen,
+			tea.ExecProcess(c, func(err error) tea.Msg {
+				// After editor exits, restart the launcher
+				if err != nil {
+					return tea.Quit()
+				}
+				// Restart the launcher
+				restart := exec.Command(os.Args[0])
+				restart.Stdin = os.Stdin
+				restart.Stdout = os.Stdout
+				restart.Stderr = os.Stderr
+				restart.Run()
+				os.Exit(0)
+				return nil
+			}),
+		)()
+	}
+}
+
 // editConfigInTmux opens the config file in a tmux split
 func editConfigInTmux() tea.Cmd {
 	return func() tea.Msg {
@@ -590,32 +646,128 @@ func editConfigInTmux() tea.Cmd {
 	}
 }
 
-// runCommandDirectly runs a command directly in the current terminal (non-tmux mode)
+// runCommandDirectly runs a command directly in the current terminal using tea.ExecProcess
 func runCommandDirectly(item launchItem) tea.Cmd {
 	return func() tea.Msg {
-		// Change to working directory if specified
+		// Build the command with working directory handling
+		cmdStr := item.Command
 		if item.Cwd != "" {
-			if err := os.Chdir(item.Cwd); err != nil {
-				fmt.Printf("Error changing directory to %s: %v\n", item.Cwd, err)
-				os.Exit(1)
-			}
+			cmdStr = fmt.Sprintf("cd %s && %s", shellescape(item.Cwd), item.Command)
 		}
 
-		// Print what we're running
-		fmt.Printf("Running: %s\n", item.Command)
+		c := exec.Command("sh", "-c", cmdStr)
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
 
-		// Execute command using shell
-		cmd := exec.Command("sh", "-c", item.Command)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		// Use TFE's pattern: ClearScreen + ExecProcess
+		return tea.Sequence(
+			tea.ClearScreen,
+			tea.ExecProcess(c, func(err error) tea.Msg {
+				return tea.Quit()
+			}),
+		)()
+	}
+}
+
+// shellescape escapes a string for safe use in shell commands
+func shellescape(s string) string {
+	// Simple quote escaping - wrap in single quotes and escape any single quotes
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// spawnInTmuxWindow spawns a command in a new tmux window (detached/background)
+func spawnInTmuxWindow(item launchItem) tea.Cmd {
+	return func() tea.Msg {
+		// Build command with working directory
+		cmdStr := item.Command
+		if item.Cwd != "" {
+			cmdStr = fmt.Sprintf("cd %s && %s", shellescape(item.Cwd), item.Command)
+		}
+
+		// Create tmux window with item name as window name
+		// -d flag = don't switch to the new window (stay in launcher)
+		windowName := item.Name
+		cmd := exec.Command("tmux", "new-window", "-d", "-n", windowName, "sh", "-c", cmdStr)
 
 		if err := cmd.Run(); err != nil {
-			fmt.Printf("Command failed: %v\n", err)
-			os.Exit(1)
+			return spawnCompleteMsg{err: err}
 		}
 
-		os.Exit(0)
+		// Don't quit - stay in launcher so user can spawn more
+		return nil
+	}
+}
+
+// spawnMultipleForeground spawns multiple commands as tmux windows and exits launcher
+func spawnMultipleForeground(items []launchItem) tea.Cmd {
+	return func() tea.Msg {
+		fmt.Fprintf(os.Stderr, "DEBUG: spawnMultipleForeground called with %d items\n", len(items))
+
+		for i, item := range items {
+			fmt.Fprintf(os.Stderr, "DEBUG: Spawning item %d: %s\n", i+1, item.Name)
+
+			// Build command with working directory
+			cmdStr := item.Command
+			if item.Cwd != "" {
+				cmdStr = fmt.Sprintf("cd %s && %s", shellescape(item.Cwd), item.Command)
+			}
+
+			// Create tmux window with item name
+			// No -d flag = switches to each new window
+			windowName := item.Name
+			cmd := exec.Command("tmux", "new-window", "-n", windowName, "sh", "-c", cmdStr)
+
+			if err := cmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "DEBUG: Failed to spawn %s: %v\n", item.Name, err)
+				continue
+			}
+
+			fmt.Fprintf(os.Stderr, "DEBUG: Successfully spawned %s\n", item.Name)
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		fmt.Fprintf(os.Stderr, "DEBUG: Finished spawning, now quitting launcher\n")
+
+		// Quit launcher - user is now in tmux with multiple windows
+		return tea.Quit()
+	}
+}
+
+// spawnMultipleDetached spawns multiple commands in separate tmux windows
+func spawnMultipleDetached(items []launchItem) tea.Cmd {
+	return func() tea.Msg {
+		fmt.Fprintf(os.Stderr, "DEBUG: spawnMultipleDetached called with %d items\n", len(items))
+
+		for i, item := range items {
+			fmt.Fprintf(os.Stderr, "DEBUG: Spawning item %d: %s\n", i+1, item.Name)
+
+			// Build command with working directory
+			cmdStr := item.Command
+			if item.Cwd != "" {
+				cmdStr = fmt.Sprintf("cd %s && %s", shellescape(item.Cwd), item.Command)
+			}
+
+			// Create tmux window with item name
+			// -d flag = don't switch to the new window (stay in launcher)
+			windowName := item.Name
+			cmd := exec.Command("tmux", "new-window", "-d", "-n", windowName, "sh", "-c", cmdStr)
+
+			if err := cmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "DEBUG: Failed to spawn %s: %v\n", item.Name, err)
+				// Continue spawning others even if one fails
+				continue
+			}
+
+			fmt.Fprintf(os.Stderr, "DEBUG: Successfully spawned %s\n", item.Name)
+
+			// Small delay between spawns
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		fmt.Fprintf(os.Stderr, "DEBUG: Finished spawning all items\n")
+
+		// Don't quit - stay in launcher
 		return nil
 	}
 }

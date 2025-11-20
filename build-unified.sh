@@ -4,21 +4,21 @@
 
 echo "Building tui-launcher with unified tab architecture..."
 
-go build -o tui-launcher \
-    types.go \
-    types_unified.go \
-    model_unified.go \
-    tab_routing.go \
-    main_test_tabs.go
+# Use standard go build (picks up all .go files and packages)
+go build -o tui-launcher
 
 if [ $? -eq 0 ]; then
     echo "✓ Build successful: ./tui-launcher"
     echo ""
-    echo "Launch tab is now integrated!"
-    echo "Press 1 to see the Launch tab (actual tui-launcher interface)"
-    echo "Press 2/3 to see Sessions/Templates placeholders"
+    echo "Installing to ~/.local/bin/..."
+    cp tui-launcher ~/.local/bin/
+    echo "✓ Installed to ~/.local/bin/tui-launcher"
     echo ""
-    echo "Run: ./tui-launcher"
+    echo "Launch tab is now integrated!"
+    echo "Press 't' to toggle between Tmux and Direct modes"
+    echo "Press 'e' to edit config"
+    echo ""
+    echo "Run: tui-launcher (or ./tui-launcher)"
 else
     echo "✗ Build failed"
     exit 1

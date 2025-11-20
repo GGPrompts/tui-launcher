@@ -188,7 +188,9 @@ type Model struct {
 	// Terminal detection
 	terminalType terminalType
 	insideTmux   bool
-	useTmux      bool
+
+	// Spawn mode toggle
+	detachedMode bool // When true, spawn in tmux windows (background)
 }
 
 // New creates a new Launch tab model
@@ -223,7 +225,7 @@ func New(width, height int) Model {
 		loading:         true,
 		terminalType:    detectTerminal(),
 		insideTmux:      isInsideTmux(),
-		useTmux:         true, // Default to tmux mode
+		detachedMode:    false, // Default to foreground mode
 	}
 }
 

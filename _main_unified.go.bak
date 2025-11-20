@@ -1,0 +1,44 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// main_unified.go - Unified Entry Point (Phase 1 Test)
+// This file demonstrates the tab routing implementation
+// To test: rename this to main.go (backup the original first)
+
+func mainUnified() {
+	// Check for popup mode flag
+	popupMode := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--popup" {
+			popupMode = true
+		}
+	}
+
+	// Create unified model
+	m := initialUnifiedModel(popupMode)
+
+	// Create Bubble Tea program
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+
+	// Run the program
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running program: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Phase 1 Testing Instructions:
+// 1. Backup current main.go: mv main.go main_old.go
+// 2. Rename this file: mv main_unified.go main.go
+// 3. Update main() to call mainUnified()
+// 4. Build: go build
+// 5. Test tab switching: ./tui-launcher
+//    - Press 1/2/3 to switch tabs
+//    - Press Tab/Shift+Tab to cycle
+//    - Press q to quit

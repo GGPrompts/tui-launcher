@@ -39,13 +39,15 @@ func (m Model) View() string {
 	sb.WriteString("Working Dir: " + cwd)
 
 	if m.insideTmux {
-		sb.WriteString(" (tmux)")
+		sb.WriteString(" (in tmux)")
 	}
+
+	// Show spawn mode
 	sb.WriteString(" | Mode: ")
-	if m.useTmux {
-		sb.WriteString("Tmux")
+	if m.detachedMode {
+		sb.WriteString("Detached")
 	} else {
-		sb.WriteString("Direct")
+		sb.WriteString("Foreground")
 	}
 	sb.WriteString("\n\n")
 
@@ -110,6 +112,7 @@ func (m Model) View() string {
 
 	// Status line
 	sb.WriteString("\n")
+
 	if len(m.selectedItems) > 0 {
 		sb.WriteString(fmt.Sprintf("Selected: %d items | ", len(m.selectedItems)))
 	}
@@ -118,11 +121,11 @@ func (m Model) View() string {
 	var footerText string
 	switch mode {
 	case layoutDesktop:
-		footerText = "↑/↓: nav  Tab: panes  Space: expand/select  Enter: launch  e: edit  c: clear  q: quit"
+		footerText = "↑/↓: nav  Tab: panes  Space: select  Enter: launch  d: detached  e: edit  c: clear  q: quit"
 	case layoutCompact:
-		footerText = "↑/↓: nav  Tab: switch  Space: select  Enter: launch  e: edit  c: clear  q: quit"
+		footerText = "↑/↓: nav  Tab: switch  Space: select  Enter: launch  d: detached  e: edit  c: clear  q: quit"
 	case layoutMobile:
-		footerText = "↑/↓: nav  Tab: switch  i: info  Space: select  Enter: launch  q: quit"
+		footerText = "↑/↓: nav  Space: select  Enter: launch  d: detached  q: quit"
 	}
 
 	// Truncate footer if needed (no scrolling)

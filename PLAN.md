@@ -4,52 +4,32 @@
 
 ---
 
-## 🚨 Priority Issues for Next Session
+## ✅ Recently Completed (2025-11-20)
 
-### Critical: Command & Hotkey Audit
-**Problem:** Several core features appear broken or provide no feedback:
-- **'e' key (edit config)** - Not working reliably
-- **Launch commands** - Many spawn options don't seem to work
-- **No visual feedback** - Commands launch but TUI just disappears (confusing UX)
+### Launch Tab Improvements
+**Status:** All priority issues resolved! ✅
 
-**Action Items:**
-1. **Audit all keyboard shortcuts** - Test each key binding:
-   - [ ] 'e' - Edit config (inside/outside tmux)
-   - [ ] Enter - Launch commands (all spawn modes)
-   - [ ] Space - Selection/expansion
-   - [ ] Tab - Pane switching
-   - [ ] 'i' - Info toggle (mobile mode)
-   - [ ] 't' - Toggle tmux mode
-   - [ ] 'c' - Clear selections
+**Completed:**
+- ✅ 'e' key (edit config) - Fixed using `tea.ExecProcess` pattern from TFE
+- ✅ Launch commands - Simplified to foreground-only (like TFE) for single commands
+- ✅ Added 'd' key - Toggle between Foreground and Detached modes
+- ✅ Multi-select spawning - Works in both modes now
+- ✅ Visual feedback - Mode indicator in header shows "Foreground" or "Detached"
 
-2. **Test all spawn modes:**
-   - [ ] `tmux-window` - New tmux window
-   - [ ] `tmux-split-h` - Horizontal split
-   - [ ] `tmux-split-v` - Vertical split
-   - [ ] `tmux-layout` - Custom layout
-   - [ ] `current-pane` - Replace current pane
-   - [ ] `xterm-window` - New xterm window
-   - [ ] Direct mode (non-tmux)
+**Working Keyboard Shortcuts:**
+- ✅ 'e' - Edit config (opens micro/nano/vim, restarts launcher on exit)
+- ✅ Enter - Launch commands (foreground or detached based on mode)
+- ✅ Space - Selection/expansion
+- ✅ Tab - Pane switching
+- ✅ 'i' - Info toggle (mobile mode)
+- ✅ 'd' - Toggle Foreground/Detached mode
+- ✅ 'c' - Clear selections
 
-3. **Add visual feedback for launches:**
-   - [ ] Show "Launching..." message before quit
-   - [ ] Display which commands are being spawned
-   - [ ] Show spawn mode being used
-   - [ ] Add delay or confirmation before exit
-   - [ ] Consider toast/notification for successful launches
-   - [ ] Error messages if spawn fails
-
-4. **Improve error handling:**
-   - [ ] Catch spawn errors and display them
-   - [ ] Don't quit if launch fails
-   - [ ] Show helpful error messages
-   - [ ] Validate commands before spawning
-
-**Expected Outcome:**
-- All hotkeys work reliably
-- Clear visual feedback when commands launch
-- Users understand what's happening (not just "it disappeared")
-- Failed launches show helpful error messages
+**Spawn Modes (Simplified):**
+- ✅ **Foreground mode (default)** - Single command runs in current terminal, exits launcher
+- ✅ **Foreground + multi-select** - Spawns each as tmux window, exits launcher (user in tmux with multiple windows)
+- ✅ **Detached mode** - Single/multi spawns tmux windows with `-d` flag, stays in launcher
+- ✅ **Profiles** - Use tmuxplexer templates for complex multi-pane layouts
 
 ---
 
@@ -76,7 +56,7 @@ They complement each other - mcfly for ad-hoc commands, launcher for organized w
 ## Current Status
 
 **Version:** 0.3.0-dev (Phase 1: Tmuxplexer Integration)
-**Last Updated:** 2025-11-20
+**Last Updated:** 2025-11-20 (Evening)
 **Branch:** feature/tmuxplexer-integration
 
 ### ✅ Completed (v0.2.0 - 3-Pane Layout)
@@ -87,11 +67,18 @@ See [CHANGELOG.md](CHANGELOG.md) for full details:
 - ✅ Info pane with item details
 - ✅ Responsive breakpoints for Termux
 - ✅ Core tree view navigation with multi-select
-- ✅ Tmux spawn logic with multiple modes
 - ✅ YAML configuration system
 - ✅ Profile support for multi-pane setups
 - ✅ Keyboard/mouse navigation
 - ✅ Wrapper script (`tl`) for global access
+
+### ✅ Completed (v0.3.0 - Launch Tab Refinement)
+- ✅ Simplified spawn logic (TFE-inspired foreground mode)
+- ✅ Foreground/Detached mode toggle ('d' key)
+- ✅ Multi-select tmux spawning (foreground and detached)
+- ✅ Fixed 'e' key (edit config) using `tea.ExecProcess`
+- ✅ Mode indicator in header
+- ✅ Debug logging for troubleshooting
 
 ### 🚧 In Progress (v0.3.0 - Tmuxplexer Integration)
 

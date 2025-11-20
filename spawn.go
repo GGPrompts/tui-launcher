@@ -35,12 +35,9 @@ func spawnSingle(item launchItem, mode spawnMode) tea.Cmd {
 		case spawnCurrentPane:
 			err = tmuxCurrentPane(item)
 		default:
-			// Auto-detect: use tmux if inside tmux, otherwise xterm
-			if insideTmux() {
-				err = tmuxSplitHorizontal(item)
-			} else {
-				err = xtermWindow(item)
-			}
+			// Default: use current pane (foreground)
+			// Non-tmux mode is handled at higher level in model.go
+			err = tmuxCurrentPane(item)
 		}
 
 		return spawnCompleteMsg{err: err}

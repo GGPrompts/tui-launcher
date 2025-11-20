@@ -1,0 +1,45 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"gopkg.in/yaml.v3"
+	"tui-launcher/tabs/launch"
+)
+
+func main() {
+	fmt.Println("Testing config loading...")
+
+	// Load config using the launch package's Config type
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("Error getting home dir: %v\n", err)
+		os.Exit(1)
+	}
+
+	configPath := filepath.Join(homeDir, ".config", "tui-launcher", "config.yaml")
+	fmt.Printf("Config path: %s\n", configPath)
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		fmt.Printf("Error reading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	var config launch.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		fmt.Printf("Error parsing YAML: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Config loaded successfully!\n")
+	fmt.Printf("  Projects: %d\n", len(config.Projects))
+	fmt.Printf("  Tools: %d\n", len(config.Tools))
+	fmt.Printf("  Scripts: %d\n", len(config.Scripts))
+
+	if len(config.Projects) > 0 {
+		fmt.Printf("\nFirst project: %s\n", config.Projects[0].Name)
+	}
+}

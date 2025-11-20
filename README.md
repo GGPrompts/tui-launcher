@@ -89,22 +89,36 @@ tools:
 - **↑/↓** or **j/k** - Move cursor (vim keys supported!)
 - **→** or **l** - Expand category
 - **←** or **h** - Collapse category
+- **Tab** - Switch between panes (Global Tools ↔ Projects)
 - **Mouse wheel** - Scroll through items
 
-### Selection
-- **Space** - Context-aware: Expand category OR select command
-- **c** - Clear all selections
+### Selection & Launch
+- **Space** - Select/deselect items (multi-select)
 - **Enter** - Launch selected item(s)
+- **c** - Clear all selections
 
 ### Modes
-- **t** - Toggle tmux mode (tmux spawning vs direct execution)
+- **d** - Toggle Foreground/Detached mode
+  - **Foreground (default)**: Single commands run in terminal, multi-select spawns tmux windows and exits
+  - **Detached**: Spawns tmux windows in background, launcher stays open
+- **e** - Edit config file
+- **i** - Toggle info pane (mobile mode)
 - **q** or **Ctrl+C** - Quit
 
-### Multi-Select Launch
-When multiple items selected:
-1. Press **Enter** to open layout dialog
-2. Use **↑/↓** to choose layout (quad split, tiled, etc.)
-3. Press **Enter** to launch with selected layout
+### Multi-Select Workflows
+
+**Foreground Mode (default):**
+1. Select multiple items with **Space**
+2. Press **Enter** → Each spawns as a tmux window
+3. Launcher exits, you're in tmux with multiple windows
+4. Use **Ctrl+B w** to switch between windows
+
+**Detached Mode (press 'd'):**
+1. Select multiple items with **Space**
+2. Press **Enter** → Each spawns as tmux window in background
+3. Launcher stays open (spawn more if needed)
+4. Press **2** to switch to Sessions tab
+5. View all windows with live previews, attach to any
 
 ## Development
 

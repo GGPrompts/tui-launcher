@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-11-20 - Launch Tab Refinement
+
+### Added
+- **Foreground/Detached mode toggle** - Press 'd' to switch between modes
+  - **Foreground mode (default)**: Commands run in current terminal, launcher exits
+  - **Detached mode**: Commands spawn as background tmux windows, launcher stays open
+- **Mode indicator in header** - Shows current mode (Foreground/Detached)
+- **Multi-select tmux spawning**:
+  - Foreground mode: Spawns each item as tmux window, exits launcher
+  - Detached mode: Spawns each with `-d` flag (background), stays in launcher
+- **TFE-inspired command execution** - Uses `tea.ExecProcess` with `tea.ClearScreen` pattern
+- **Debug logging** - Stderr output for troubleshooting spawn operations
+
+### Changed
+- **Simplified spawn logic** - Removed complex tmux/direct mode toggle ('t' key)
+- **Single command foreground launch** - Always runs in current terminal by default
+- **Edit config ('e' key)** - Now uses `tea.ExecProcess` for reliable editor launching
+- **Multi-select behavior** - Creates tmux windows instead of using layout dialog
+- **Config spawn field** - Now ignored for single commands (use 'd' toggle instead)
+
+### Fixed
+- **Edit config not working** - Fixed by using proper `tea.ExecProcess` pattern
+- **Commands spawning in foreground when expecting detached** - Added `-d` flag to tmux commands
+- **Multi-select only launching first item** - Now spawns all selected items properly
+- **Terminal state after external programs** - Proper cleanup with `tea.ClearScreen`
+
+### Technical Details
+- Launch tab fully migrated to `tabs/launch/` package
+- Unified model architecture with tab routing
+- Removed `useTmux` field, replaced with `detachedMode`
+- Error handling continues through all items (doesn't stop on first error)
+
 ## [0.2.0] - 2025-11-19 - Responsive Layout & Quick CD
 
 ### Added
@@ -41,6 +73,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Golden Rule #4: Use proportional sizing (weights), not hardcoded pixels
 
 ### Changed
+- **Spawn behavior now smarter (foreground by default)**:
+  - Commands without explicit `spawn:` mode now use current pane/terminal (foreground)
+  - Outside tmux: Replaces current terminal instead of spawning xterm window
+  - Inside tmux: Uses current pane instead of creating split
+  - Explicit spawn modes (tmux-window, tmux-split-h, etc.) still work as configured
+  - You can always relaunch with `tl` - no need for TUI to stay resident
 - Footer is now static (no auto-scrolling) to prevent flashing
 - Footer text shortened to fit better on small screens
 - Tree building refactored to split items into global/project panes
