@@ -367,6 +367,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if isValid {
+				// Special handling for project categories - CD into them
+				if currentItem.ItemType == typeCategory && currentItem.Cwd != "" {
+					// This is a project category with a directory - CD into it
+					if err := writeCDTarget(currentItem.Cwd); err != nil {
+						m.err = fmt.Errorf("failed to write CD target: %w", err)
+						return m, nil
+					}
+					return m, tea.Quit
+				}
+
 				// If items are selected, launch them
 				if len(m.selectedItems) > 0 {
 					// Launch all selected items in batch
@@ -1100,6 +1110,10 @@ func (m *model) updateInfoPane() {
 	case typeCategory:
 		info.WriteString(fmt.Sprintf("Type: Category\n"))
 		info.WriteString(fmt.Sprintf("Children: %d items\n", len(currentItem.Children)))
+		if currentItem.Cwd != "" {
+			info.WriteString(fmt.Sprintf("\n📂 Project Directory:\n%s\n", currentItem.Cwd))
+			info.WriteString("\n💡 Press Enter to CD into this project\n")
+		}
 
 	case typeCommand:
 		info.WriteString(fmt.Sprintf("Type: Command\n"))
@@ -1200,6 +1214,17 @@ func (m model) calculateLayout() (int, int, int, int) {
 		infoHeight := contentHeight - treeHeight
 		return leftWidth, rightWidth, treeHeight, infoHeight
 	}
+}
+
+// writeCDTarget writes the target directory to a file so the shell wrapper can cd after exit
+func writeCDTarget(path string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	targetFile := filepath.Join(homeDir, ".tui-launcher_cd_target")
+	return os.WriteFile(targetFile, []byte(path), 0644)
 }
 
 // editConfigInTmux opens the config file in a tmux split

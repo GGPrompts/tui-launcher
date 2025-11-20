@@ -20,6 +20,7 @@ func buildTreeFromConfig(config Config) ([]launchItem, []launchItem) {
 				Path:     "projects/" + proj.Name,
 				ItemType: typeCategory,
 				Icon:     proj.Icon,
+				Cwd:      expandPath(proj.Path), // Store project directory for CD
 				Children: []launchItem{},
 			}
 
