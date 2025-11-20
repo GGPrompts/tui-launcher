@@ -86,8 +86,22 @@ Combine the best of both tools into a single, powerful TUI for managing:
 - Enter: Attach to session
 - d/K: Kill session
 - r: Rename session
-- s: Save as template
+- **s: Save current session as template** (extracts pane layout, commands, working dirs)
 - Ctrl+R: Refresh
+
+**Session Save Feature:**
+When you press 's' on a session, tmuxplexer:
+1. Extracts pane layout (positions, dimensions)
+2. Captures running command in each pane
+3. Captures working directory for each pane
+4. Detects layout format (2x2, 3x3, etc.)
+5. Prompts for template name/category
+6. Saves as reusable template
+
+This means you can:
+- Build a workspace layout manually in tmux
+- Press 's' to save it as a template
+- Later recreate it instantly with Enter
 
 ### Tab 3: Templates (From Tmuxplexer)
 **Left Pane:** Template categories tree
@@ -101,9 +115,94 @@ Combine the best of both tools into a single, powerful TUI for managing:
 
 **Actions:**
 - Enter: Create session from template
-- n: New template (wizard)
+- **n: New template wizard** (step-by-step template creation)
+- **s: Save from Launch tab** (convert selected commands to template)
 - e: Edit in $EDITOR
 - Delete: Remove template
+
+**Template Creation Workflows:**
+
+1. **Wizard (n key):** Interactive step-by-step
+   - Step 1: Name & category
+   - Step 2: Working directory
+   - Step 3: Layout (2x2, 3x3, etc.)
+   - Step 4: Commands for each pane
+   - Creates template from scratch
+
+2. **Save from Session (s key in Sessions tab):**
+   - Extracts your current tmux layout
+   - Captures running commands & working dirs
+   - Auto-detects layout format
+   - Quick save for ad-hoc layouts
+
+3. **Convert from Launch (NEW):**
+   - Select multiple commands in Launch tab
+   - Press 's' to save as template
+   - Prompts for layout (how to arrange selected commands)
+   - Converts organized launcher commands to reusable template
+
+   Example: Select 4 project commands → Save as "MyProject Dev" template → Later launch as 2x2 workspace
+
+---
+
+## Unified Workflows: How They Combine
+
+### Workflow 1: Quick Launch → Session → Save as Template
+**Use Case:** "I found a good combination, let me save it"
+
+1. **Launch Tab:** Select 4 commands (Space to multi-select)
+2. Press Enter → Commands launch in tmux with auto layout
+3. Auto-switch to **Sessions Tab** → See new session in preview
+4. Adjust layout manually in tmux if needed
+5. Press **s** → Save as template
+6. Now it's in **Templates Tab** for instant re-creation
+
+### Workflow 2: Template → Session → Refine → Update Template
+**Use Case:** "My template needs tweaking"
+
+1. **Templates Tab:** Press Enter on "Frontend Dev"
+2. Creates session, auto-switch to **Sessions Tab**
+3. In actual tmux: Add another pane, change commands
+4. Back in TUI: Press **s** on the session
+5. Save with same name → Updates template
+
+### Workflow 3: Project Commands → Template
+**Use Case:** "Turn my project commands into a workspace"
+
+1. **Launch Tab:** Navigate to "TUI Launcher" project
+2. Multi-select: "Run Tests", "Watch Build", "Run Dev", "Git"
+3. Press **s** (new key binding)
+4. Wizard prompts: "Layout? (2x2)" → Enter
+5. Template created in **Templates Tab**
+6. Press Enter → Instant 2x2 workspace for this project
+
+### Workflow 4: Quick Access from Any Tmux Session
+**Use Case:** "I need to launch something NOW"
+
+1. In any tmux session: Press **Ctrl+B O**
+2. 90% screen popup appears with launcher
+3. **Launch Tab:** Select commands → Enter → Launch
+4. OR **Sessions Tab:** Attach to different session
+5. OR **Templates Tab:** Create new workspace
+6. Press **q** → Popup hides, back to your work
+
+### Workflow 5: Organize Everything
+**Use Case:** "I want all my workspaces organized"
+
+1. **Launch Tab:**
+   - Projects organized hierarchically
+   - Individual commands ready to launch
+   - Quick CD into project directories
+
+2. **Sessions Tab:**
+   - See all active workspaces
+   - Preview what's running in each
+   - Attach, kill, rename as needed
+
+3. **Templates Tab:**
+   - Categorized workspace templates
+   - Quick creation from proven layouts
+   - Evolve templates as needs change
 
 ---
 
