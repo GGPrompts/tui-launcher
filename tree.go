@@ -6,11 +6,13 @@ import (
 	"strings"
 )
 
-// buildTreeFromConfig converts config into a flat tree structure
-func buildTreeFromConfig(config Config) []launchItem {
-	var items []launchItem
+// buildTreeFromConfig converts config into separate global and project tree structures
+// Returns (globalItems, projectItems) for the two-pane layout
+func buildTreeFromConfig(config Config) ([]launchItem, []launchItem) {
+	var globalItems []launchItem
+	var projectItems []launchItem
 
-	// Add projects
+	// Projects go to right pane
 	if len(config.Projects) > 0 {
 		for _, proj := range config.Projects {
 			item := launchItem{
@@ -51,11 +53,11 @@ func buildTreeFromConfig(config Config) []launchItem {
 				item.Children = append(item.Children, profItem)
 			}
 
-			items = append(items, item)
+			projectItems = append(projectItems, item)
 		}
 	}
 
-	// Add tools
+	// Tools go to left pane (global)
 	if len(config.Tools) > 0 {
 		for _, cat := range config.Tools {
 			item := launchItem{
@@ -80,11 +82,11 @@ func buildTreeFromConfig(config Config) []launchItem {
 				item.Children = append(item.Children, cmdItem)
 			}
 
-			items = append(items, item)
+			globalItems = append(globalItems, item)
 		}
 	}
 
-	// Add scripts
+	// Scripts go to left pane (global)
 	if len(config.Scripts) > 0 {
 		for _, cat := range config.Scripts {
 			item := launchItem{
@@ -109,11 +111,11 @@ func buildTreeFromConfig(config Config) []launchItem {
 				item.Children = append(item.Children, cmdItem)
 			}
 
-			items = append(items, item)
+			globalItems = append(globalItems, item)
 		}
 	}
 
-	return items
+	return globalItems, projectItems
 }
 
 // flattenTree converts hierarchical items into a flat list for display

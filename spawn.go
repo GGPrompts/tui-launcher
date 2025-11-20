@@ -105,7 +105,7 @@ func spawnInCurrentSession(items []launchItem, layout tmuxLayout, baseDir string
 		}
 
 		// Change directory and run command
-		if err := tmuxSendKeys(target+".0", fmt.Sprintf("cd %s && %s", cwd, items[0].Command)); err != nil {
+		if err := tmuxSendKeys(target+".0", fmt.Sprintf("cd '%s' && %s", cwd, items[0].Command)); err != nil {
 			return fmt.Errorf("failed to send keys to pane 0: %w", err)
 		}
 	}
@@ -216,7 +216,8 @@ func tmuxSplitHorizontal(item launchItem) error {
 		cwd = os.Getenv("HOME")
 	}
 
-	cmd := exec.Command("tmux", "split-window", "-h", "-c", cwd, item.Command)
+	// Use shell to properly execute the command
+	cmd := exec.Command("tmux", "split-window", "-h", "-c", cwd, "sh", "-c", item.Command)
 	return cmd.Run()
 }
 
@@ -227,7 +228,8 @@ func tmuxSplitVertical(item launchItem) error {
 		cwd = os.Getenv("HOME")
 	}
 
-	cmd := exec.Command("tmux", "split-window", "-v", "-c", cwd, item.Command)
+	// Use shell to properly execute the command
+	cmd := exec.Command("tmux", "split-window", "-v", "-c", cwd, "sh", "-c", item.Command)
 	return cmd.Run()
 }
 
@@ -238,7 +240,8 @@ func tmuxNewWindow(item launchItem) error {
 		cwd = os.Getenv("HOME")
 	}
 
-	cmd := exec.Command("tmux", "new-window", "-c", cwd, "-n", item.Name, item.Command)
+	// Use shell to properly execute the command
+	cmd := exec.Command("tmux", "new-window", "-c", cwd, "-n", item.Name, "sh", "-c", item.Command)
 	return cmd.Run()
 }
 
@@ -250,7 +253,7 @@ func tmuxCurrentPane(item launchItem) error {
 	}
 
 	// Change directory and run command
-	commandStr := fmt.Sprintf("cd %s && %s", cwd, item.Command)
+	commandStr := fmt.Sprintf("cd '%s' && %s", cwd, item.Command)
 	return tmuxSendKeys("", commandStr)
 }
 
@@ -262,7 +265,7 @@ func xtermWindow(item launchItem) error {
 	}
 
 	// Use shell -c to run cd + command
-	shellCmd := fmt.Sprintf("cd %s && %s", cwd, item.Command)
+	shellCmd := fmt.Sprintf("cd '%s' && %s", cwd, item.Command)
 	cmd := exec.Command("xterm", "-e", "sh", "-c", shellCmd)
 
 	// Start in background

@@ -120,6 +120,47 @@ func (t terminalType) String() string {
 	}
 }
 
+// paneType represents which pane has focus in multi-pane layouts
+type paneType int
+
+const (
+	paneGlobal paneType = iota // Left pane (global tools, AI, scripts)
+	paneProject                 // Right pane (projects)
+)
+
+func (p paneType) String() string {
+	switch p {
+	case paneGlobal:
+		return "Global Tools"
+	case paneProject:
+		return "Projects"
+	default:
+		return "Unknown"
+	}
+}
+
+// layoutMode represents responsive layout modes based on terminal size
+type layoutMode int
+
+const (
+	layoutDesktop layoutMode = iota // 3-pane: Global | Projects | Info (≥80 width, >12 height)
+	layoutCompact                    // 2-pane: Combined tree + Info (<80 width)
+	layoutMobile                     // 1-pane: Tree only, 'i' toggles info (≤12 height)
+)
+
+func (l layoutMode) String() string {
+	switch l {
+	case layoutDesktop:
+		return "Desktop"
+	case layoutCompact:
+		return "Compact"
+	case layoutMobile:
+		return "Mobile"
+	default:
+		return "Unknown"
+	}
+}
+
 // Emoji constants (NO variation selectors - U+FE0F causes width bugs!)
 const (
 	// Spawn mode emojis
@@ -160,6 +201,14 @@ type paneConfig struct {
 	Cwd     string `yaml:"cwd"`
 }
 
+// paneInfo represents metadata for displaying item information
+type paneInfo struct {
+	description string
+	cliFlags    string
+	repo        string
+	mdPath      string // Path to .md file for detailed info
+}
+
 // launchItem represents a command, category, or profile in the launcher
 type launchItem struct {
 	Name         string        `yaml:"name"`
@@ -194,11 +243,28 @@ type model struct {
 	width  int
 	height int
 
-	// Tree navigation
+	// Tree navigation (legacy single-pane mode)
 	cursor        int
 	rootItems     []launchItem
 	treeItems     []launchTreeItem
 	expandedItems map[string]bool
+
+	// Multi-pane layout state
+	activePane        paneType           // Which pane has focus
+	globalItems       []launchItem       // Items for left pane (tools, AI, scripts)
+	projectItems      []launchItem       // Items for right pane (projects)
+	globalTreeItems   []launchTreeItem   // Flattened tree for global pane
+	projectTreeItems  []launchTreeItem   // Flattened tree for project pane
+	globalCursor      int                // Cursor position in global pane
+	projectCursor     int                // Cursor position in project pane
+	globalExpanded    map[string]bool    // Expanded items in global pane
+	projectExpanded   map[string]bool    // Expanded items in project pane
+
+	// Info pane state
+	currentInfo       paneInfo           // Info for selected item
+	infoContent       string             // Rendered content for info pane
+	showingInfo       bool               // Toggle for mobile mode
+	showingProjects   bool               // Toggle for compact mode (global vs projects)
 
 	// Selection state
 	selectedItems map[string]bool
