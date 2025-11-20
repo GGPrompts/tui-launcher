@@ -75,80 +75,160 @@ They complement each other - mcfly for ad-hoc commands, launcher for organized w
 
 ## Current Status
 
-**Version:** 0.2.0-dev (in progress)
-**Last Updated:** 2025-01-19
+**Version:** 0.3.0-dev (Phase 1: Tmuxplexer Integration)
+**Last Updated:** 2025-11-20
+**Branch:** feature/tmuxplexer-integration
 
-### ✅ Completed (v0.1.0 - MVP)
-See [CHANGELOG.md](CHANGELOG.md) for full details of completed features:
-- Core tree view navigation with multi-select
-- Tmux spawn logic with multiple modes
-- YAML configuration system
-- Profile support for multi-pane setups
-- Keyboard/mouse navigation
-- Wrapper script (`tl`) for global access
+### ✅ Completed (v0.2.0 - 3-Pane Layout)
+See [CHANGELOG.md](CHANGELOG.md) for full details:
+- ✅ 3-pane responsive layout (Desktop/Compact/Mobile modes)
+- ✅ Global Tools | Projects | Info pane structure
+- ✅ Tab navigation between panes
+- ✅ Info pane with item details
+- ✅ Responsive breakpoints for Termux
+- ✅ Core tree view navigation with multi-select
+- ✅ Tmux spawn logic with multiple modes
+- ✅ YAML configuration system
+- ✅ Profile support for multi-pane setups
+- ✅ Keyboard/mouse navigation
+- ✅ Wrapper script (`tl`) for global access
 
-### 🚧 In Progress (v0.2.0)
+### 🚧 In Progress (v0.3.0 - Tmuxplexer Integration)
 
-#### 3-Pane Responsive Layout System
-Implementing a responsive layout that adapts to terminal size:
+**Goal:** Integrate tmuxplexer's session management and template features into tui-launcher as tabs.
 
-**Desktop Mode** (≥80 width, >12 height):
+#### Phase 1: Tab Architecture & Launch Tab ✅ COMPLETE
+
+**Completed (2025-11-20):**
+- ✅ Created unified tab-based architecture
+- ✅ Implemented tab routing (1/2/3 keys, Tab/Shift+Tab cycling)
+- ✅ Created `tabs/launch/` package with full Launch tab functionality
+- ✅ Created `shared/` layer merging spawn.go + tmuxplexer tmux operations
+- ✅ Migrated all tui-launcher features to Launch tab
+- ✅ Build succeeds, compiles cleanly
+- ✅ Fixed config loading bug (message routing)
+- ✅ Fixed tab bar display bug (now shows on initial launch)
+
+**Ready for Testing:**
+- 🔍 Real terminal testing needed (config loading, spawning, Quick CD)
+- 🔍 Verify tab bar displays correctly on launch
+- 🔍 Test all keyboard shortcuts and spawn modes
+
+**Architecture:**
 ```
-┌──────────────────┬──────────────────┐
-│ Global Tools     │ Projects         │
-│ ├─ Git           │ ├─ TUI Launcher  │
-│ └─ AI            │ └─ TKan          │
-├──────────────────┴──────────────────┤
-│ Info: lazygit                       │
-│ Terminal UI for git commands        │
-└─────────────────────────────────────┘
+tabs/launch/          # Launch tab (existing tui-launcher features)
+  ├── model.go        # Model, Init(), config loading
+  ├── view.go         # Multi-pane rendering
+  ├── update.go       # Keyboard/mouse handling
+  └── tree.go         # Tree building from config
+
+shared/               # Unified tmux operations
+  ├── tmux.go         # Spawn + session management
+  └── types.go        # Shared type definitions
+
+model_unified.go      # Tab routing coordinator
+tab_routing.go        # Message routing to active tab
+types_unified.go      # Tab types (tabName, unifiedModel)
 ```
 
-**Compact Mode** (<80 width) - Termux landscape:
+**Tab System:**
 ```
-┌────────────────────────────────────┐
-│ Global Tools / Projects (Tab)      │
-├────────────────────────────────────┤
-│ Info pane                          │
-└────────────────────────────────────┘
+┌─ 1. Launch ──┬─ 2. Sessions ──┬─ 3. Templates ──┐
+│ [Active Tab Content Below]                      │
+└──────────────────────────────────────────────────┘
 ```
 
-**Mobile Mode** (≤12 height) - Termux with keyboard:
-```
-┌────────────────────────────────────┐
-│ Tree only (press 'i' for info)    │
-└────────────────────────────────────┘
-```
+- **Tab 1 (Launch):** ✅ Full tui-launcher functionality
+- **Tab 2 (Sessions):** 🔜 Tmux session management (from tmuxplexer)
+- **Tab 3 (Templates):** 🔜 Workspace templates (from tmuxplexer)
 
-**Status:** Implementation in progress by tt-cc-ofc session
-**Files:** See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed steps
+**Files:** See [PHASE1_LAUNCH_TAB_COMPLETE.md](PHASE1_LAUNCH_TAB_COMPLETE.md) for detailed implementation
+
+#### Next Steps (Phase 1 Continuation)
+
+**Priority 1: Real Terminal Testing**
+- [ ] Verify config loads from ~/.config/tui-launcher/config.yaml
+- [ ] Test navigation (arrows, vim keys, mouse)
+- [ ] Test multi-select and spawning
+- [ ] Test Quick CD functionality
+- [ ] Test config editing (e key)
+- [ ] Verify all spawn modes work
+
+**Priority 2: Sessions Tab (Partial)**
+- [ ] Create `tabs/sessions/` package
+- [ ] Copy session model from tmuxplexer
+- [ ] Implement basic sessions list view
+- [ ] Wire into tab routing
+- [ ] **Checkpoint:** Press 2 → See tmux sessions list
+
+**Priority 3: Templates Tab (Partial)**
+- [ ] Create `tabs/templates/` package
+- [ ] Copy templates model from tmuxplexer
+- [ ] Implement template tree view
+- [ ] Wire into tab routing
+- [ ] **Checkpoint:** Press 3 → See template list
 
 ---
 
 ## Roadmap
 
-### v0.2.0 - Responsive 3-Pane Layout (Current)
-- [ ] 3-pane layout for desktop (Global | Projects | Info)
-- [ ] Responsive breakpoints for Termux compatibility
-- [ ] Info pane with markdown file support
-- [ ] Tab navigation between panes
-- [ ] 'i' key to toggle info in mobile mode
-- [ ] Update config schema for item descriptions and info files
+### v0.2.0 - Responsive 3-Pane Layout ✅ COMPLETE
+- ✅ 3-pane layout for desktop (Global | Projects | Info)
+- ✅ Responsive breakpoints for Termux compatibility
+- ✅ Info pane with item details
+- ✅ Tab navigation between panes (Tab key)
+- ✅ 'i' key to toggle info in mobile mode
+- ✅ Config schema supports project paths and profiles
 
-### v0.3.0 - Documentation & Polish
-- [ ] Update README with installation instructions
-- [ ] Add keybindings reference
+### v0.3.0 - Tmuxplexer Integration (CURRENT)
+
+**Phase 1: Tab Architecture & Launch Tab** ✅ COMPLETE
+- ✅ Unified tab-based architecture (1/2/3 keys)
+- ✅ Launch tab with all tui-launcher features
+- ✅ Shared tmux operations layer
+- ✅ Config loading and tree building
+- ✅ Tab bar displays on initial launch
+- 🔍 Real terminal testing (config, spawning, Quick CD)
+
+**Phase 2: Sessions Tab** 🔜 NEXT
+- [ ] Tmux sessions list (from tmuxplexer)
+- [ ] Session management (attach, kill, rename)
+- [ ] Live session preview
+- [ ] Claude Code status tracking
+- [ ] Window navigation
+- [ ] Auto-refresh (2-second interval)
+
+**Phase 3: Templates Tab** 🔜 UPCOMING
+- [ ] Workspace templates tree view
+- [ ] Categorized templates (Projects, Agents, Tools)
+- [ ] Template creation wizard
+- [ ] Save session as template
+- [ ] Template preview and editing
+- [ ] Grid layout support (2x2, 3x3, etc.)
+
+**Phase 4: Unified Config** 🔜 FUTURE
+- [ ] Merge launcher.yaml + templates.json → single config
+- [ ] Migration script for existing configs
+- [ ] Unified template and command definitions
+
+**Phase 5: Cross-Tab Features** 🔜 FUTURE
+- [ ] Launch → Sessions (auto-switch after spawn)
+- [ ] Sessions → Templates (save as template)
+- [ ] Templates → Launch (show in tree)
+- [ ] Popup mode integration (Ctrl+B O)
+
+### v0.4.0 - Documentation & Polish
+- [ ] Update README with tab-based interface
+- [ ] Add keybindings reference (all tabs)
 - [ ] Screenshot/demo GIF
-- [ ] Config examples for common workflows
-- [ ] TFE integration example
+- [ ] Config examples for templates
 - [ ] Installation script (`install.sh`)
 
-### v0.4.0 - Enhanced Features
+### v0.5.0 - Enhanced Features
 - [ ] Favorites system (star items)
 - [ ] Recent launches (history)
 - [ ] Search/filter (Ctrl+F or /)
-- [ ] Command-line args (`--project`, `--tool`)
-- [ ] Session management (list, kill, switch)
+- [ ] Command-line args (`--project`, `--tool`, `--template`)
 - [ ] Error handling improvements
 
 ---
