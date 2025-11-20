@@ -29,21 +29,29 @@ Built with Go, [Bubble Tea](https://github.com/charmbracelet/bubbletea), and [Li
 - 📦 **Project-based** - Set working directories per command
 - 🔧 **Saved profiles** - Complex multi-pane setups in one command
 
-## Quick Start
+## Installation
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/tui-launcher.git
+git clone https://github.com/GGPrompts/tui-launcher.git
 cd tui-launcher
 
-# Install dependencies
-go mod tidy
+# Install (builds, copies to ~/.local/bin, creates 'tl' wrapper)
+./install.sh
 
-# Build
-go build
+# Add to PATH (if not already)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
 
-# Run (when complete)
-./tui-launcher
+## Quick Start
+
+```bash
+# Launch from anywhere
+tl
+
+# Or use full command
+tui-launcher
 ```
 
 ## Configuration
@@ -78,20 +86,25 @@ tools:
 ## Keyboard Shortcuts
 
 ### Navigation
-- **↑/↓** - Move cursor
-- **→** - Expand category
-- **←** - Collapse category
-- **Enter** - Launch item(s)
+- **↑/↓** or **j/k** - Move cursor (vim keys supported!)
+- **→** or **l** - Expand category
+- **←** or **h** - Collapse category
+- **Mouse wheel** - Scroll through items
 
 ### Selection
-- **Space** - Toggle selection
-- **a** - Select all in category
-- **c** - Clear selections
-- **Esc** - Clear selections / close dialog
+- **Space** - Context-aware: Expand category OR select command
+- **c** - Clear all selections
+- **Enter** - Launch selected item(s)
 
-### Launching
-- **Enter** - Launch (single or batch)
-- **Ctrl+Enter** - Quick launch with default layout
+### Modes
+- **t** - Toggle tmux mode (tmux spawning vs direct execution)
+- **q** or **Ctrl+C** - Quit
+
+### Multi-Select Launch
+When multiple items selected:
+1. Press **Enter** to open layout dialog
+2. Use **↑/↓** to choose layout (quad split, tiled, etc.)
+3. Press **Enter** to launch with selected layout
 
 ## Development
 
